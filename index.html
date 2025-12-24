@@ -1,0 +1,4794 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Citation Network Analysis: Cartel & Terrorist Recruitment | CEE</title>
+    <script src="https://d3js.org/d3.v7.min.js"></script>
+    <style>
+        * { margin: 0; padding: 0; box-sizing: border-box; }
+        
+        body {
+            font-family: 'Barlow', -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif;
+            background: #f8f9fa;
+            color: #1C3D52;
+            overflow: hidden;
+        }
+        
+        #main-container { display: flex; width: 100vw; height: 100vh; }
+        
+        #network-container { 
+            flex: 1; 
+            position: relative; 
+            background: #ffffff;
+            border-right: 2px solid #1B5E8C;
+        }
+        
+        #insights-column {
+            width: 420px;
+            background: #f8f9fa;
+            overflow-y: auto;
+            padding: 70px 16px 16px 16px;
+        }
+        
+        #header {
+            position: fixed; top: 0; left: 0; right: 0;
+            background: #ffffff;
+            padding: 16px 24px;
+            box-shadow: 0 1px 4px rgba(0, 0, 0, 0.08);
+            z-index: 2000;
+            border-bottom: 1px solid #e0e0e0;
+        }
+        
+        #header h1 { font-size: 18px; color: #1C3D52; font-weight: 600; margin-bottom: 3px; }
+        #header p { font-size: 11px; color: #1B5E8C; font-weight: 400; }
+        
+        .insight-card {
+            background: #ffffff;
+            border: 2px solid #1B5E8C;
+            border-radius: 6px;
+            padding: 14px;
+            margin-bottom: 14px;
+            box-shadow: 0 2px 8px rgba(27, 94, 140, 0.1);
+        }
+        
+        .insight-card h2 {
+            font-size: 12px;
+            color: #1B5E8C;
+            font-weight: 600;
+            margin-bottom: 10px;
+            border-bottom: 2px solid #4A9FB5;
+            padding-bottom: 4px;
+        }
+        
+        .insight-card h3 {
+            font-size: 10px;
+            color: #1C3D52;
+            font-weight: 600;
+            margin: 8px 0 4px 0;
+        }
+        
+        .insight-card p {
+            font-size: 9px;
+            line-height: 1.4;
+            color: #1C3D52;
+            margin-bottom: 6px;
+        }
+        
+        .finding-item {
+            background: #f0f7fa;
+            border-left: 3px solid #1B5E8C;
+            padding: 8px;
+            margin: 6px 0;
+            font-size: 9px;
+            line-height: 1.4;
+        }
+        
+        .finding-item strong { color: #1B5E8C; }
+        
+        .chart-container {
+            margin: 10px 0;
+            padding: 8px;
+            background: #ffffff;
+            border-radius: 4px;
+        }
+        
+        .bar-chart-item {
+            display: flex;
+            align-items: center;
+            margin: 4px 0;
+            font-size: 8px;
+        }
+        
+        .bar-label {
+            width: 60px;
+            color: #1C3D52;
+            font-weight: 500;
+        }
+        
+        .bar-visual {
+            flex: 1;
+            height: 16px;
+            background: #1B5E8C;
+            border-radius: 2px;
+            position: relative;
+        }
+        
+        .bar-value {
+            position: absolute;
+            right: 4px;
+            top: 50%;
+            transform: translateY(-50%);
+            color: #ffffff;
+            font-weight: 700;
+            font-size: 8px;
+        }
+        
+        .matrix-cell {
+            display: inline-block;
+            width: 30px;
+            height: 20px;
+            margin: 1px;
+            text-align: center;
+            line-height: 20px;
+            font-size: 7px;
+            color: #ffffff;
+            font-weight: 600;
+            border-radius: 2px;
+        }
+        
+        .bridge-list {
+            font-size: 8px;
+            line-height: 1.6;
+        }
+        
+        .bridge-item {
+            padding: 4px 6px;
+            margin: 3px 0;
+            background: #f0f7fa;
+            border-left: 2px solid #4A9FB5;
+        }
+        
+        #tooltip {
+            position: absolute; padding: 10px;
+            background: #ffffff; border: 2px solid #1B5E8C; border-radius: 5px;
+            pointer-events: none; opacity: 0; transition: opacity 0.2s;
+            font-size: 10px; max-width: 380px;
+            box-shadow: 0 4px 22px rgba(27, 94, 140, 0.28);
+            z-index: 3000;
+        }
+        
+        #tooltip h3 { margin: 0 0 4px 0; color: #1B5E8C; font-size: 11px; font-weight: 700; }
+        #tooltip .author { font-size: 9px; color: #4A9FB5; font-style: italic; margin-bottom: 4px; }
+        #tooltip .metrics {
+            margin: 6px 0; padding: 6px; background: #f8f9fa; border-radius: 3px;
+            font-size: 8px; display: grid; grid-template-columns: 1fr 1fr; gap: 4px;
+        }
+        #tooltip .metric-item { display: flex; justify-content: space-between; }
+        #tooltip .metric-label { color: #1C3D52; }
+        #tooltip .metric-value { color: #1B5E8C; font-weight: 700; }
+        #tooltip .thesis {
+            margin: 5px 0; color: #1C3D52; font-size: 8px; line-height: 1.4;
+            border-left: 3px solid #4A9FB5; padding-left: 6px;
+        }
+        
+        .node { stroke: #1B5E8C; stroke-width: 1.5px; cursor: pointer; transition: all 0.2s; }
+        .node:hover { stroke-width: 2.5px; stroke: #00A651; }
+        .node-central { stroke: #00A651; stroke-width: 2px; }
+        
+        .link { stroke: #4A9FB5; stroke-opacity: 0.15; stroke-width: 1px; }
+        .link-highlight { stroke: #00A651; stroke-opacity: 0.8; stroke-width: 2px; }
+        
+        .node-label {
+            font-size: 5px; fill: #1C3D52; text-anchor: middle;
+            pointer-events: none; font-weight: 600; opacity: 0;
+        }
+        .node-label-visible { opacity: 1; }
+        
+        .legend {
+            position: absolute; top: 70px; left: 16px;
+            background: #ffffff; border: 2px solid #1B5E8C; border-radius: 5px;
+            padding: 10px; z-index: 1000;
+            box-shadow: 0 2px 8px rgba(27, 94, 140, 0.12);
+            font-size: 8px;
+        }
+        
+        .legend h3 {
+            font-size: 9px; color: #1C3D52; font-weight: 600;
+            margin: 0 0 6px 0; border-bottom: 1px solid #e0e0e0; padding-bottom: 3px;
+        }
+        
+        .legend-item {
+            display: flex; align-items: center; margin: 3px 0;
+        }
+        
+        .legend-color {
+            width: 12px; height: 12px; border-radius: 50%;
+            margin-right: 6px; border: 1px solid #1C3D52;
+        }
+        
+        .legend-label { color: #1C3D52; font-weight: 500; }
+        
+        .controls {
+            position: absolute; bottom: 16px; left: 16px;
+            background: #ffffff; border: 2px solid #1B5E8C; border-radius: 5px;
+            padding: 8px; z-index: 1000;
+            box-shadow: 0 4px 16px rgba(27, 94, 140, 0.18);
+        }
+        
+        .control-btn {
+            background: #1B5E8C; border: none; color: #ffffff;
+            padding: 5px 9px; margin: 2px; border-radius: 4px;
+            cursor: pointer; font-size: 8px; font-weight: 600;
+            transition: background 0.2s;
+        }
+        
+        .control-btn:hover { background: #00A651; }
+        
+        #cee-logo {
+            position: fixed; bottom: 16px; right: 16px;
+            font-size: 8px; color: #4A9FB5; text-align: right; z-index: 1000;
+            background: rgba(255,255,255,0.9);
+            padding: 6px 10px;
+            border-radius: 4px;
+        }
+        
+        #cee-logo strong { color: #1B5E8C; font-size: 9px; display: block; margin-bottom: 2px; }
+    </style>
+</head>
+<body>
+    <div id="header">
+        <h1>Citation Network Analysis: Cartel & Terrorist Recruitment Research</h1>
+        <p>Centrality-Based Analysis | 135 Sources | 403 Key Citations | Center for Emerging Economies</p>
+    </div>
+    
+    <div id="main-container">
+        <div id="network-container">
+            <svg id="network-svg"></svg>
+            <div class="legend">
+                <h3>Domain Legend</h3>
+                <div class="legend-item">
+                    <div class="legend-color" style="background: #E74C3C;"></div>
+                    <div class="legend-label">Cartel Research (53)</div>
+                </div>
+                <div class="legend-item">
+                    <div class="legend-color" style="background: #3498DB;"></div>
+                    <div class="legend-label">Terrorism Research (41)</div>
+                </div>
+                <div class="legend-item">
+                    <div class="legend-color" style="background: #F39C12;"></div>
+                    <div class="legend-label">Convergence Theory (23)</div>
+                </div>
+                <div class="legend-item">
+                    <div class="legend-color" style="background: #2ECC71;"></div>
+                    <div class="legend-label">Hezbollah Studies (6)</div>
+                </div>
+                <div class="legend-item">
+                    <div class="legend-color" style="background: #95A5A6;"></div>
+                    <div class="legend-label">Government Reports (5)</div>
+                </div>
+                <div class="legend-item">
+                    <div class="legend-color" style="background: #9B59B6;"></div>
+                    <div class="legend-label">Journalism (7)</div>
+                </div>
+            </div>
+            <div class="controls">
+                <button class="control-btn" onclick="resetView()">Reset</button>
+                <button class="control-btn" onclick="toggleLabels()">Labels</button>
+                <button class="control-btn" onclick="showCentral()">Central</button>
+                <button class="control-btn" onclick="showBridges()">Bridges</button>
+            </div>
+        </div>
+        
+        <div id="insights-column">
+            <!-- Recruitment Tactics Card -->
+            <div class="insight-card">
+                <h2>Recruitment Tactics: Key Findings</h2>
+                <div class="finding-item">
+                    <strong>Economic vs Ideological Appeal:</strong> Cartels recruit with direct economic incentives (salaries, vehicles, weapons) while terrorist groups offer ideological purpose and identity within a cosmic struggle.
+                </div>
+                <div class="finding-item">
+                    <strong>Social Media Convergence:</strong> Both exploit the same platforms (TikTok, Telegram, Instagram) to target alienated youth. Cartels adopted ISIS-style propaganda for brand building rather than ideological conversion.
+                </div>
+                <div class="finding-item">
+                    <strong>Recruitment Volume:</strong> Mexican cartels must recruit 350-370 people per week to maintain operational capacity due to high attrition from violence and arrests (Prieto-Curiel et al., 2023).
+                </div>
+                <div class="finding-item">
+                    <strong>Military Professionalization:</strong> Los Zetas, formed by 30+ Mexican Special Forces (GAFE) deserters in late 1990s, introduced military-grade training camps and tactical capabilities to cartel operations.
+                </div>
+                <div class="finding-item">
+                    <strong>Forced Recruitment:</strong> DTOs extensively use coercion, particularly of minors, as lookouts (halcones), distributors, and eventually assassins in controlled territories.
+                </div>
+            </div>
+            
+            <!-- Ideological Differences Card -->
+            <div class="insight-card">
+                <h2>Role of Ideology</h2>
+                <h3>Terrorist Groups</h3>
+                <p><strong>Central pillar:</strong> Salafi-jihadist ideology offers comprehensive worldview, identity, and purpose. Recruitment is about finding devotees willing to die for the cause.</p>
+                <h3>Drug Cartels</h3>
+                <p><strong>Weak/synthetic construct:</strong> Blend of folk religion (Santa Muerte), narco-culture glamorization, and social banditry narratives. Serves as branding and justification, not core motivation.</p>
+                <h3>Assessment</h3>
+                <p>Ideologies are fundamentally incompatible. Cartel "ideology" is a tool for cohesion; terrorist ideology is the end goal itself. This limits deep strategic cooperation.</p>
+            </div>
+            
+            <!-- Economic Incentives Card -->
+            <div class="insight-card">
+                <h2>Economic Incentives Comparison</h2>
+                <div class="finding-item">
+                    <strong>Cartel Model:</strong> Direct path to wealth. Recruitment resembles job offers with clear salary expectations. Economic appeal is aspirational (luxury lifestyle, exotic vehicles, power).
+                </div>
+                <div class="finding-item">
+                    <strong>Terrorist Model:</strong> Economic factors are supporting, not primary. ISIS offered $400-$1,200/month salaries in conflict zones (2016)—significant in war-torn economies but framed as stipends for fighters in a larger cause. Salaries later cut due to financial pressures.
+                </div>
+                <div class="finding-item">
+                    <strong>Recruitment Demographics:</strong> ISIS recruited 30,000+ foreign fighters from 100+ countries between 2011-2016. American teenagers recruited as cartel smugglers earn $2,000-$10,000 per border crossing via social media offers.
+                </div>
+                <div class="finding-item">
+                    <strong>Target Demographics:</strong> Both exploit economically disadvantaged youth. Cartels target regions with scarce legal advancement opportunities. Terrorists target impoverished conflict zones where joining provides stability.
+                </div>
+            </div>
+            
+            <!-- Tactical Innovation Card -->
+            <div class="insight-card">
+                <h2>Tactical Innovation & Convergence</h2>
+                <div class="finding-item">
+                    <strong>Military Model (Los Zetas):</strong> Paradigm shift when Mexican Special Forces deserters formed Los Zetas, introducing professional military training, tactics, and intelligence capabilities to cartel operations.
+                </div>
+                <div class="finding-item">
+                    <strong>ISIS Propaganda Revolution:</strong> Moved from static lecture videos to dynamic multi-platform strategy with high-quality media, social media swarming, and tailored messaging for different audiences.
+                </div>
+                <div class="finding-item">
+                    <strong>One-Way Transfer:</strong> Cartels demonstrably adopted terrorist propaganda techniques (high-fidelity videos, social swarms). Little evidence of reverse transfer. Innovation is weaponization of these tactics for criminal ends.
+                </div>
+            </div>
+            
+            <!-- Crime-Terror Nexus Card -->
+            <div class="insight-card">
+                <h2>Crime-Terror Nexus: Hezbollah</h2>
+                <p>Most significant operational convergence occurs through Hezbollah's cocaine trafficking partnerships in Latin America.</p>
+                <div class="finding-item">
+                    <strong>Operational Model:</strong> Hezbollah leverages diaspora communities and criminal expertise to move drugs and launder money for cartels, taking a cut to finance terror operations.
+                </div>
+                <div class="finding-item">
+                    <strong>Geographic Focus:</strong> Tri-Border Area (TBA) of Argentina, Brazil, Paraguay serves as primary nexus. DEA's 2016 Project Cassandra uncovered $1 billion+ in Hezbollah drug trafficking and money laundering operations across Latin America.
+                </div>
+                <div class="finding-item">
+                    <strong>Organizational Scale:</strong> CJNG operates in 28 of 32 Mexican states with estimated 5,000-10,000 members. Hezbollah maintains 20,000-30,000 fighters with extensive Latin American diaspora networks for trafficking operations.
+                </div>
+                <div class="finding-item">
+                    <strong>Threat Assessment:</strong> Transactional relationships will persist and may expand. Shared need for illicit financial networks and smuggling routes creates mutually beneficial partnership.
+                </div>
+            </div>
+        </div>
+    </div>
+    
+    <div id="cee-logo">
+        <strong>Center for Emerging Economies</strong>
+        eecenter.org
+    </div>
+    
+    <div id="tooltip"></div>
+    
+    <script>
+        // Load data
+        const networkData = {
+  "nodes": [
+    {
+      "id": "prietocuriel2023",
+      "label": "Prieto-Curiel, Campedelli, Hope (2023)",
+      "author": "Prieto-Curiel, Campedelli, Hope",
+      "title": "Reducing cartel recruitment is the only way to lower violence in Mexico",
+      "thesis": "Cartels in Mexico are large employers (160,000-185,000 members), and counter-intuitively, increasing incapacitation (arrests) would increase violence and cartel size. The most effective policy to reduce violence and cartel size is a proactive strategy focused on reducing recruitment.",
+      "group": "cartels",
+      "tier": 2,
+      "year": 2023,
+      "size": 6.559440559440559,
+      "in_degree": 6,
+      "out_degree": 10,
+      "betweenness": 10.0,
+      "centrality_score": 0.5699300699300699
+    },
+    {
+      "id": "chomczynski2023",
+      "label": "Chomczyński, Guy, Azaola (2023)",
+      "author": "Chomczyński, Guy, Azaola",
+      "title": "Beyond money, power, and masculinity: Toward an analytical perspective on recruitment to Mexican drug trafficking organizations",
+      "thesis": "Recruitment into Mexican drug trafficking organizations is not solely driven by financial gain or power, but is also heavily influenced by notions of masculinity, attachment to social groups, and shared experiences, which the authors term a \"collective trajectory.\" The decision to join is viewed in collective terms, often connected to immediate social groups.",
+      "group": "cartels",
+      "tier": 3,
+      "year": 2023,
+      "size": 7.076923076923077,
+      "in_degree": 7,
+      "out_degree": 11,
+      "betweenness": 11.0,
+      "centrality_score": 0.6346153846153846
+    },
+    {
+      "id": "arjona2012",
+      "label": "Arjona, Kalyvas (2012)",
+      "author": "Arjona, Kalyvas",
+      "title": "Recruitment into armed groups in Colombia: A survey of demobilized fighters",
+      "thesis": "This study uses a survey of demobilized combatants in Colombia to shift the focus of civil war research to the micro-level, finding that individual-level factors, rather than macro-level conditions, are key determinants of recruitment into armed groups.",
+      "group": "terrorism",
+      "tier": 1,
+      "year": 2012,
+      "size": 2.4615384615384617,
+      "in_degree": 3,
+      "out_degree": 0,
+      "betweenness": 0.0,
+      "centrality_score": 0.057692307692307696
+    },
+    {
+      "id": "garcia2006",
+      "label": "García (2006)",
+      "author": "García",
+      "title": "'Narcoballads': The Psychology and Recruitment Process of the 'Narco'",
+      "thesis": "Using content analysis of 'narcocorridos' and social identity theory, this study describes the techniques used to recruit individuals into drug cartels, finding that the process follows similar patterns to other criminal organizations, driven by needs for power, belonging, and respect.",
+      "group": "cartels",
+      "tier": 3,
+      "year": 2006,
+      "size": 2.7272727272727275,
+      "in_degree": 0,
+      "out_degree": 2,
+      "betweenness": 2.0,
+      "centrality_score": 0.09090909090909091
+    },
+    {
+      "id": "offstein2003",
+      "label": "Offstein, Aristizábal (2003)",
+      "author": "Offstein, Aristizábal",
+      "title": "An historical review and analysis of Colombian guerrilla movements: FARC, ELN and EPL",
+      "thesis": "The paper historically reviews the FARC, ELN, and EPL, arguing that these Colombian guerrilla movements have transitioned from political, Marxist-style groups to organizations primarily driven by economic motives, engaging in illicit activities like organized crime, kidnapping, and extortion.",
+      "group": "convergence",
+      "tier": 2,
+      "year": 2003,
+      "size": 3.3986013986013983,
+      "in_degree": 2,
+      "out_degree": 3,
+      "betweenness": 3.0,
+      "centrality_score": 0.17482517482517482
+    },
+    {
+      "id": "logan2012",
+      "label": "Logan (2012)",
+      "author": "Logan",
+      "title": "A Profile of Los Zetas: Mexico's Second Most Powerful Drug Cartel",
+      "thesis": "Los Zetas evolved from an elite security detail for the Gulf Cartel into an independent, powerful criminal organization, distinguished by its military training, high level of violence, and expansion of revenue-generating operations beyond drug trafficking. The article surveys the organization's formation, development, and expansion into the United States, and considers potential future scenarios.",
+      "group": "cartels",
+      "tier": 2,
+      "year": 2012,
+      "size": 4.643356643356643,
+      "in_degree": 3,
+      "out_degree": 3,
+      "betweenness": 6.0,
+      "centrality_score": 0.3304195804195804
+    },
+    {
+      "id": "jaffe2015",
+      "label": "Jaffe (2015)",
+      "author": "Jaffe",
+      "title": "Los Zetas: Organizational Structure, Tactics, and the Innovation of a Modern Cartel",
+      "thesis": "This paper compares and contrasts different interpretations of the Los Zetas cartel, focusing on their organizational structure, innovative tactics, and how they function as a modern cartel in comparison to the Mexican government. The core argument is that Los Zetas has innovated a new type of modern cartel through military-like structure, extreme brutality, and the use of social media.",
+      "group": "cartels",
+      "tier": 3,
+      "year": 2015,
+      "size": 3.090909090909091,
+      "in_degree": 0,
+      "out_degree": 3,
+      "betweenness": 3.0,
+      "centrality_score": 0.13636363636363635
+    },
+    {
+      "id": "saab2009",
+      "label": "Saab, Taylor (2009)",
+      "author": "Saab, Taylor",
+      "title": "Criminality and armed groups: A comparative study of FARC and paramilitary groups in Colombia",
+      "thesis": "This article argues that while armed political organizations and criminal groups appear similar due to their exploitation of illicit markets, the goals, political environment, and membership of sub-state armed groups like FARC and Colombian paramilitaries are the primary factors that shape and distinguish their criminal behavior from purely economically-motivated criminal groups.",
+      "group": "convergence",
+      "tier": 1,
+      "year": 2009,
+      "size": 4.5874125874125875,
+      "in_degree": 5,
+      "out_degree": 5,
+      "betweenness": 5.0,
+      "centrality_score": 0.32342657342657344
+    },
+    {
+      "id": "bjorkhaug2010",
+      "label": "Bjørkhaug (2010)",
+      "author": "Bjørkhaug",
+      "title": "Child soldiers in Colombia: The recruitment of children into non-state armed groups",
+      "thesis": "This article argues that most cases of child soldier recruitment in Colombia occur in the grey zone between voluntary and coerced recruitment, challenging the assumption in demobilization policies that all voluntarily recruited children are victims due to an inability to make a free choice. The former child soldiers are presented as vital agents whose choices are shaped by their particular experiences and circumstances.",
+      "group": "terrorism",
+      "tier": 2,
+      "year": 2010,
+      "size": 3.090909090909091,
+      "in_degree": 0,
+      "out_degree": 3,
+      "betweenness": 3.0,
+      "centrality_score": 0.13636363636363635
+    },
+    {
+      "id": "downing2022",
+      "label": "Downing (2022)",
+      "author": "Downing",
+      "title": "The dynamics of child recruitment in armed conflict",
+      "thesis": "The article likely argues that child recruitment by armed groups is not a monolithic phenomenon but is driven by a complex interplay of individual, community, and organizational factors, and that effective counter-recruitment strategies must be tailored to these specific dynamics.",
+      "group": "terrorism",
+      "tier": 3,
+      "year": 2022,
+      "size": 3.8181818181818183,
+      "in_degree": 0,
+      "out_degree": 5,
+      "betweenness": 5.0,
+      "centrality_score": 0.22727272727272727
+    },
+    {
+      "id": "sanin2012",
+      "label": "Sanin (2012)",
+      "author": "Sanin",
+      "title": "Recruitment in civil war: A preliminary discussion of the Colombian case",
+      "thesis": "The chapter critiques economic models of civil war recruitment that oversimplify the process to 'greed' and 'coercion,' arguing that they fail to account for the crucial role of organizational structures and social networks in sustaining non-state combat organizations in Colombia.",
+      "group": "terrorism",
+      "tier": 2,
+      "year": 2012,
+      "size": 3.2447552447552446,
+      "in_degree": 1,
+      "out_degree": 3,
+      "betweenness": 3.0,
+      "centrality_score": 0.15559440559440557
+    },
+    {
+      "id": "calderoni2022",
+      "label": "Calderoni, Comunale, Campedelli, Marchesi, Manzi, Frualdo (2022)",
+      "author": "Calderoni, Comunale, Campedelli, Marchesi, Manzi, Frualdo",
+      "title": "Organized crime groups: A systematic review of individual-level risk factors related to recruitment",
+      "thesis": "This systematic review summarizes the empirical evidence on individual-level risk factors for recruitment into organized crime, finding relatively strong evidence that being male, having prior criminal activity, and prior violence are associated with a higher probability of recruitment, though the overall evidence base is weak.",
+      "group": "cartels",
+      "tier": 2,
+      "year": 2022,
+      "size": 4.489510489510489,
+      "in_degree": 2,
+      "out_degree": 5,
+      "betweenness": 6.0,
+      "centrality_score": 0.31118881118881114
+    },
+    {
+      "id": "bloom2017",
+      "label": "Bloom (2017)",
+      "author": "Bloom",
+      "title": "Constructing expertise: Terrorist recruitment and 'talent spotting' in the PIRA, Al Qaeda, and ISIS",
+      "thesis": "The paper posits a terrorism \"recruitment cycle\" that alternates between labor-intensive and expertise-intensive periods, explaining the duality of terrorist recruits as both \"masterminds\" and \"imbeciles.\" This cycle is influenced by external pressures and opportunities, leading to shifts in recruitment strategies and propaganda messaging across groups like Al Qaeda, ISIS, and the PIRA.",
+      "group": "terrorism",
+      "tier": 1,
+      "year": 2017,
+      "size": 2.9230769230769234,
+      "in_degree": 6,
+      "out_degree": 0,
+      "betweenness": 0.0,
+      "centrality_score": 0.11538461538461539
+    },
+    {
+      "id": "prezelj2024",
+      "label": "Prezelj, Zalokar (2024)",
+      "author": "Prezelj, Zalokar",
+      "title": "Recruitment models and approaches of Islamist terrorist groups: The cases of al Qaeda and ISIS",
+      "thesis": "This paper demonstrates that the recruitment process for Islamist terrorist groups like al-Qaeda and ISIS is a flexible, multi-tool process that adapts to the circumstances and character of targeted individuals. The authors confirm the hypothesis that both groups interchangeably use various recruitment models (Net, Funnel, Infection, Seed Crystal) and approaches (public/private and proximate/mediated) across different time periods and for individual terrorist cells.",
+      "group": "terrorism",
+      "tier": 3,
+      "year": 2024,
+      "size": 3.8181818181818183,
+      "in_degree": 0,
+      "out_degree": 5,
+      "betweenness": 5.0,
+      "centrality_score": 0.22727272727272727
+    },
+    {
+      "id": "sageman2008",
+      "label": "Sageman (2008)",
+      "author": "Sageman",
+      "title": "Leaderless Jihad: Terror Networks in the Twenty-First Century",
+      "thesis": "Al Qaeda has evolved from a hierarchical organization into a decentralized, global network of independent local groups, which the author terms \"leaderless jihad.\" This shift is driven by a four-step process of radicalization among Muslim youth, often facilitated by the internet, which the author argues is a self-terminating phenomenon.",
+      "group": "terrorism",
+      "tier": 1,
+      "year": 2008,
+      "size": 6.489510489510489,
+      "in_degree": 15,
+      "out_degree": 1,
+      "betweenness": 6.0,
+      "centrality_score": 0.5611888111888111
+    },
+    {
+      "id": "taarnby2005",
+      "label": "Taarnby (2005)",
+      "author": "Taarnby",
+      "title": "Recruitment of Islamist Terrorists in Europe: Trends and Perspectives",
+      "thesis": "The study analyzes the shifting trends in Islamist terrorist recruitment in Europe, concluding that the phenomenon is likely to increase and is moving from formal training structures to a more decentralized, self-contained lifestyle within European Muslim communities.",
+      "group": "terrorism",
+      "tier": 2,
+      "year": 2005,
+      "size": 3.034965034965035,
+      "in_degree": 2,
+      "out_degree": 2,
+      "betweenness": 2.0,
+      "centrality_score": 0.12937062937062938
+    },
+    {
+      "id": "fair2004",
+      "label": "Fair (2004)",
+      "author": "Fair",
+      "title": "Militant recruitment in Pakistan: Implications for Al Qaeda and other organizations",
+      "thesis": "Al Qaeda does not have a dedicated recruiting infrastructure for Pakistanis but instead relies on a web of informal relations with local militant groups to gain operational collaborators and individuals for attacks within Pakistan.",
+      "group": "terrorism",
+      "tier": 1,
+      "year": 2004,
+      "size": 2.769230769230769,
+      "in_degree": 5,
+      "out_degree": 0,
+      "betweenness": 0.0,
+      "centrality_score": 0.09615384615384616
+    },
+    {
+      "id": "berger2015",
+      "label": "Berger (2015)",
+      "author": "Berger",
+      "title": "Tailored online interventions: The Islamic State's recruitment strategy",
+      "thesis": "The Islamic State has devoted significant resources to implementing a distinct online recruitment strategy, which follows targets from their introduction to the organization’s message, through a careful pruning of their social networks, before culminating in a call to action. The strategy relies on scores of users who maintain a high level of availability online, allowing them to lavish attention on potential recruits, and who provide a drumbeat of incitement to action.",
+      "group": "terrorism",
+      "tier": 1,
+      "year": 2015,
+      "size": 2.6153846153846154,
+      "in_degree": 4,
+      "out_degree": 0,
+      "betweenness": 0.0,
+      "centrality_score": 0.07692307692307693
+    },
+    {
+      "id": "winter2015",
+      "label": "Winter (2015)",
+      "author": "Winter",
+      "title": "The Virtual 'Caliphate': Understanding Islamic State's Propaganda Strategy",
+      "thesis": "This report provides an extensive analysis of the Islamic State's propaganda strategy, identifying six key narratives (brutality, mercy, victimhood, war, belonging, and utopia) and their target audiences, and argues that a military-only response is insufficient, necessitating a synchronized and comprehensive counter-propaganda approach from the international community.",
+      "group": "terrorism",
+      "tier": 1,
+      "year": 2015,
+      "size": 4.013986013986014,
+      "in_degree": 6,
+      "out_degree": 1,
+      "betweenness": 3.0,
+      "centrality_score": 0.2517482517482518
+    },
+    {
+      "id": "awan2017",
+      "label": "Awan (2017)",
+      "author": "Awan",
+      "title": "Cyber-extremism: Isis and the power of social media",
+      "thesis": "The study confirms that groups like ISIS use online platforms, such as social media, for coordinated propaganda and recruitment, portraying a \"glamorised\" image of cyber jihad to radicalise young and impressionable people. The findings, based on an analysis of 100 Facebook pages and 50 Twitter accounts, established a typology of seven key behavioral characteristics and motivations used by ISIS to spread its coordinated and controlled material.",
+      "group": "terrorism",
+      "tier": 1,
+      "year": 2017,
+      "size": 2.4615384615384617,
+      "in_degree": 3,
+      "out_degree": 0,
+      "betweenness": 0.0,
+      "centrality_score": 0.057692307692307696
+    },
+    {
+      "id": "yayla2017",
+      "label": "Yayla, Speckhard (2017)",
+      "author": "Yayla, Speckhard",
+      "title": "Telegram: The Mighty Application that ISIS Loves",
+      "thesis": "ISIS favors the Telegram application over other social media platforms for distributing propaganda, disseminating news, and communicating due to Telegram's large file-hosting feature, end-to-end encryption, and less aggressive account takedown policy compared to platforms like Twitter and Facebook. This makes Telegram a secure and reliable communication apparatus for foreign fighters and recruitment.",
+      "group": "terrorism",
+      "tier": 2,
+      "year": 2017,
+      "size": 4.125874125874126,
+      "in_degree": 2,
+      "out_degree": 3,
+      "betweenness": 5.0,
+      "centrality_score": 0.26573426573426573
+    },
+    {
+      "id": "gartensteinross2009",
+      "label": "Gartenstein-Ross, Grossman (2009)",
+      "author": "Gartenstein-Ross, Grossman",
+      "title": "Homegrown Terrorists in the US and UK: An Empirical Examination of the Radicalization Process",
+      "thesis": "The study empirically examines the radicalization process of homegrown terrorists in the US and UK, finding that their characteristics and pathways differ significantly from those of the global terrorist movement, challenging existing models of radicalization.",
+      "group": "terrorism",
+      "tier": 1,
+      "year": 2009,
+      "size": 5.160839160839161,
+      "in_degree": 4,
+      "out_degree": 2,
+      "betweenness": 7.0,
+      "centrality_score": 0.3951048951048951
+    },
+    {
+      "id": "termeer2022",
+      "label": "Termeer, Duyvesteyn (2022)",
+      "author": "Termeer, Duyvesteyn",
+      "title": "The inclusion of women in jihad: gendered practices of legitimation in Islamic State recruitment propaganda",
+      "thesis": "This article explores how ISIS reconciled its recruitment of women with its patriarchal ideology by analyzing its propaganda. The study reveals three gendered narratives—women as builders of the Ummah, representatives of Islam, and guardians of the Caliphate—which assign women agency, with their violent agency developing over time, providing insight into the legitimation attempts of patriarchal terrorist organizations.",
+      "group": "terrorism",
+      "tier": 2,
+      "year": 2022,
+      "size": 3.8181818181818183,
+      "in_degree": 0,
+      "out_degree": 5,
+      "betweenness": 5.0,
+      "centrality_score": 0.22727272727272727
+    },
+    {
+      "id": "farber2023",
+      "label": "Farber (2023)",
+      "author": "Farber",
+      "title": "Countering the Financing of Terrorists' Salaries",
+      "thesis": "The article analyzes global efforts to suppress terrorist salaries, arguing that this new policy is a turning point in counter-terrorism financing, despite contradictory humanitarian, security, legal, and economic interests. The suppression of terrorist salaries is established in global norms, including the International Convention for the Suppression of the Financing of Terror and UN Security Council decisions.",
+      "group": "terrorism",
+      "tier": 3,
+      "year": 2023,
+      "size": 3.8181818181818183,
+      "in_degree": 0,
+      "out_degree": 5,
+      "betweenness": 5.0,
+      "centrality_score": 0.22727272727272727
+    },
+    {
+      "id": "shelley2014",
+      "label": "Shelley (2014)",
+      "author": "Shelley",
+      "title": "Dirty entanglements: Corruption, crime and terrorism",
+      "thesis": "The book argues that corruption, crime, and terrorism are no longer separate phenomena but are increasingly intertwined, forming \"dirty entanglements\" that pose a significant threat to global security and the economy. The core finding is that crime and corruption serve as both an incubator and a financing mechanism for terrorism, suggesting that counter-terrorism efforts must focus on disrupting these illicit financial and logistical networks.",
+      "group": "convergence",
+      "tier": 1,
+      "year": 2014,
+      "size": 6.0419580419580425,
+      "in_degree": 5,
+      "out_degree": 5,
+      "betweenness": 9.0,
+      "centrality_score": 0.5052447552447553
+    },
+    {
+      "id": "shelley2005",
+      "label": "Shelley, Picarelli (2005)",
+      "author": "Shelley, Picarelli",
+      "title": "Methods and motives: Exploring links between transnational organized crime and international terrorism",
+      "thesis": "The traditional \"methods, not motives\" approach to the crime-terror nexus is too restrictive; the interaction between transnational organized crime and international terrorism is growing deeper and more complex, necessitating a new analytical framework to identify and assess these evolving links.",
+      "group": "convergence",
+      "tier": 1,
+      "year": 2005,
+      "size": 7.230769230769231,
+      "in_degree": 8,
+      "out_degree": 4,
+      "betweenness": 11.0,
+      "centrality_score": 0.6538461538461539
+    },
+    {
+      "id": "makarenko2008",
+      "label": "Makarenko (2008)",
+      "author": "Makarenko",
+      "title": "Criminal and Terrorist networks: gauging interaction and the resultant impact on counter-terrorism",
+      "thesis": "The relationship between crime and terrorism exists along a dynamic continuum, which plots the organizational and operational interaction between both phenomena. This interaction can manifest as alliances, operational use of each other's tactics, or a full convergence into a hybrid entity.",
+      "group": "convergence",
+      "tier": 2,
+      "year": 2008,
+      "size": 5.006993006993007,
+      "in_degree": 3,
+      "out_degree": 7,
+      "betweenness": 7.0,
+      "centrality_score": 0.3758741258741259
+    },
+    {
+      "id": "dishman2001",
+      "label": "Dishman (2001)",
+      "author": "Dishman",
+      "title": "Terrorism, crime, and transformation",
+      "thesis": "This article argues that some terrorist groups have transformed into transnational criminal organizations (TCOs) more interested in profits than politics. This transformation has important implications for policymakers, but the author argues that TCOs and terrorist groups will not cooperate with each other.",
+      "group": "convergence",
+      "tier": 1,
+      "year": 2001,
+      "size": 3.902097902097902,
+      "in_degree": 10,
+      "out_degree": 1,
+      "betweenness": 1.0,
+      "centrality_score": 0.23776223776223776
+    },
+    {
+      "id": "williams2001",
+      "label": "Williams (2001)",
+      "author": "Williams",
+      "title": "Transnational criminal networks",
+      "thesis": "Old-style criminal hierarchies are reorganizing into sprawling transnational networks, which allows them to expand their scale and scope, form loose alliances, and corrupt unstable states.",
+      "group": "cartels",
+      "tier": 1,
+      "year": 2001,
+      "size": 5.846153846153847,
+      "in_degree": 25,
+      "out_degree": 0,
+      "betweenness": 0.0,
+      "centrality_score": 0.4807692307692308
+    },
+    {
+      "id": "miklaucic2013",
+      "label": "Miklaucic, Brewer (2013)",
+      "author": "Miklaucic, Brewer",
+      "title": "Convergence: Illicit Networks and National Security in the Age of Globalization",
+      "thesis": "The increasing convergence of illicit networks, such as those involved in drug trafficking and terrorism, gives them an improved ability to evade official countermeasures and exploit weaknesses in the state system. Nations must devise comprehensive and multidimensional strategies to combat the complex transnational threats posed by these increasingly interconnected networks.",
+      "group": "convergence",
+      "tier": 1,
+      "year": 2013,
+      "size": 3.9160839160839163,
+      "in_degree": 3,
+      "out_degree": 4,
+      "betweenness": 4.0,
+      "centrality_score": 0.23951048951048953
+    },
+    {
+      "id": "hofmann2011",
+      "label": "Hofmann, Schneckener (2011)",
+      "author": "Hofmann, Schneckener",
+      "title": "Engaging non-state armed actors in state- and peace-building: options and strategies",
+      "thesis": "This article assesses strategies for engaging with non-state armed actors in conflict environments by delineating options based on realist, institutionalist, and constructivist international relations theories, and matching them to the capabilities of international actors.",
+      "group": "terrorism",
+      "tier": 1,
+      "year": 2011,
+      "size": 2.6153846153846154,
+      "in_degree": 4,
+      "out_degree": 0,
+      "betweenness": 0.0,
+      "centrality_score": 0.07692307692307693
+    },
+    {
+      "id": "thomas2005",
+      "label": "Thomas, Kiser, Casebeer (2005)",
+      "author": "Thomas, Kiser, Casebeer",
+      "title": "Warlords Rising: Confronting Violent Non-State Actors",
+      "thesis": "The book provides an innovative, interdisciplinary framework of analysis to improve understanding of violent non-state actors (VNSA) and lays out a strategy for confronting, coercing, or conquering these adversaries.",
+      "group": "terrorism",
+      "tier": 1,
+      "year": 2005,
+      "size": 4.1678321678321675,
+      "in_degree": 7,
+      "out_degree": 1,
+      "betweenness": 3.0,
+      "centrality_score": 0.27097902097902093
+    },
+    {
+      "id": "hesterman2013",
+      "label": "Hesterman (2013)",
+      "author": "Hesterman",
+      "title": "The Terrorist-Criminal Nexus: An Alliance of International Drug Cartels, Organized Crime, and Terror Groups",
+      "thesis": "The book argues that a dangerous \"triad relationship\" has emerged where violent non-state actors, including terror groups, drug cartels, and organized crime, are increasingly forming alliances and sharing tactics for mutual benefit, posing a new and complex threat to national security.",
+      "group": "convergence",
+      "tier": 2,
+      "year": 2013,
+      "size": 2.3076923076923075,
+      "in_degree": 2,
+      "out_degree": 7,
+      "betweenness": 0.0,
+      "centrality_score": 0.038461538461538464
+    },
+    {
+      "id": "mullins2016",
+      "label": "Mullins, Wither (2016)",
+      "author": "Mullins, Wither",
+      "title": "Terrorism and Organized Crime",
+      "thesis": "The article assesses the similarities and differences between terrorists and criminals, identifying seven categories of crimes committed by terrorists and four types of relationships in the crime-terror nexus. It concludes with a discussion of the concept of convergence between terrorism and organized crime and its implications for counter-terrorism.",
+      "group": "convergence",
+      "tier": 2,
+      "year": 2016,
+      "size": 2.4615384615384617,
+      "in_degree": 3,
+      "out_degree": 7,
+      "betweenness": 0.0,
+      "centrality_score": 0.057692307692307696
+    },
+    {
+      "id": "azani2013",
+      "label": "Azani (2013)",
+      "author": "Azani",
+      "title": "The Hybrid Terrorist Organization: Hezbollah as a Case Study",
+      "thesis": "Hezbollah has evolved from a revolutionary terrorist organization into a prototypical hybrid terrorist organization that operates across civilian, military, and political planes. Understanding this hybrid nature is essential for comprehending global and local jihad movements.",
+      "group": "hezbollah",
+      "tier": 1,
+      "year": 2013,
+      "size": 2.3076923076923075,
+      "in_degree": 2,
+      "out_degree": 0,
+      "betweenness": 0.0,
+      "centrality_score": 0.038461538461538464
+    },
+    {
+      "id": "levitt2005",
+      "label": "Levitt (2005)",
+      "author": "Levitt",
+      "title": "Hezbollah: Financing terror through criminal enterprise",
+      "thesis": "Hezbollah relies on a diverse, global network of criminal enterprises, including smuggling, fraud, and the drug/diamond trade, to fund its terrorist activities. Therefore, counterterrorism efforts must focus on disrupting these criminal financial support networks.",
+      "group": "hezbollah",
+      "tier": 2,
+      "year": 2005,
+      "size": 2.1538461538461537,
+      "in_degree": 1,
+      "out_degree": 0,
+      "betweenness": 0.0,
+      "centrality_score": 0.019230769230769232
+    },
+    {
+      "id": "butler2011",
+      "label": "Butler (2011)",
+      "author": "Butler",
+      "title": "Hezbollah's recruitment of children: A case study",
+      "thesis": "Hezbollah's long-term success is attributed to its effective recruitment process, which is analyzed by blending political science and mathematical modeling to understand the dynamics of terrorist recruitment. The study provides a novel model to estimate the potential recruitment pool of Shiite youths.",
+      "group": "hezbollah",
+      "tier": 3,
+      "year": 2011,
+      "size": 2.0,
+      "in_degree": 0,
+      "out_degree": 0,
+      "betweenness": 0.0,
+      "centrality_score": 0.0
+    },
+    {
+      "id": "miryekta2010",
+      "label": "Miryekta (2010)",
+      "author": "Miryekta",
+      "title": "Hezbollah in the Tri-Border Area of South America",
+      "thesis": "This research exposes the actions and objectives of Hezbollah in the Tri-Border Area (TBA), arguing that the common belief that Hezbollah's terrorist and political wings are separate is a misconception. The article posits that Hezbollah maintains a large, dormant operational network in the TBA, primarily for planning attacks against Western targets, not just for fundraising.",
+      "group": "hezbollah",
+      "tier": 3,
+      "year": 2010,
+      "size": 2.0,
+      "in_degree": 0,
+      "out_degree": 0,
+      "betweenness": 0.0,
+      "centrality_score": 0.0
+    },
+    {
+      "id": "alvi2020",
+      "label": "Alvi (2020)",
+      "author": "Alvi",
+      "title": "Musical Criminology: A Comparative Analysis of Jihadist Nasheeds and Narco Corridos",
+      "thesis": "This study comparatively analyzes the musical genres of jihadist nasheeds and narco corridos, demonstrating how both traditions popularize crime and violence, affect followers, and glorify the extreme brutality of terrorism and narco-terrorism.",
+      "group": "convergence",
+      "tier": 3,
+      "year": 2020,
+      "size": 2.0,
+      "in_degree": 0,
+      "out_degree": 9,
+      "betweenness": 0.0,
+      "centrality_score": 0.0
+    },
+    {
+      "id": "bunker_sullivan2010",
+      "label": "Bunker, Sullivan (2010)",
+      "author": "Bunker, Sullivan",
+      "title": "Cartel evolution revisited: third phase cartel potentials and alternative futures in Mexico",
+      "thesis": "The essay updates a 1998 paper on cartel evolution, linking cartel phases to gang generations, applying the concept of third phase cartel potentials to Mexico, and assessing four alternative futures for Mexico and their cross-border implications for the United States.",
+      "group": "cartels",
+      "tier": 2,
+      "year": 2010,
+      "size": 2.825174825174825,
+      "in_degree": 3,
+      "out_degree": 2,
+      "betweenness": 1.0,
+      "centrality_score": 0.10314685314685315
+    },
+    {
+      "id": "campbell2014",
+      "label": "Campbell (2014)",
+      "author": "Campbell",
+      "title": "Narco-Propaganda in the Mexican “Drug War”: An Anthropological Perspective",
+      "thesis": "Mexican drug cartels should be treated as quasi-ideological political entities, not just criminal organizations, because their \"narco-propaganda\" (orchestrated violence, media control, etc.) functions as a powerful new form of political discourse to control territory and take on state functions.",
+      "group": "cartels",
+      "tier": 1,
+      "year": 2014,
+      "size": 3.2867132867132867,
+      "in_degree": 6,
+      "out_degree": 1,
+      "betweenness": 1.0,
+      "centrality_score": 0.16083916083916083
+    },
+    {
+      "id": "grillo2016",
+      "label": "Grillo (2016)",
+      "author": "Grillo",
+      "title": "Gangster Warlords: Drug Dollars, Killing Fields, and the New Politics of Latin America",
+      "thesis": "The book argues that a new breed of \"gangster warlords\" has emerged in Latin America, acting as hybrid criminal kingpins who combine the roles of CEO, terrorist, and political actor to control vast criminal empires and challenge state authority across the region. This phenomenon is fueled by the global drug trade, the availability of weapons, and the failure of traditional anti-drug strategies.",
+      "group": "cartels",
+      "tier": 1,
+      "year": 2016,
+      "size": 5.3426573426573425,
+      "in_degree": 17,
+      "out_degree": 1,
+      "betweenness": 2.0,
+      "centrality_score": 0.4178321678321678
+    },
+    {
+      "id": "dhs2024",
+      "label": "Department of Homeland Security (2024)",
+      "author": "Department of Homeland Security",
+      "title": "Homeland Threat Assessment 2024",
+      "thesis": "Terrorism, both foreign and domestic, remains a top threat to the Homeland, but other threats—including illegal drugs, critical infrastructure attacks, foreign influence campaigns, and economic espionage by adversaries like the PRC—are increasingly complex and compounded by factors like climate change and accessible AI tools.",
+      "group": "government",
+      "tier": 3,
+      "year": 2024,
+      "size": 2.0,
+      "in_degree": 0,
+      "out_degree": 0,
+      "betweenness": 0.0,
+      "centrality_score": 0.0
+    },
+    {
+      "id": "dea2016",
+      "label": "Drug Enforcement Administration (2016)",
+      "author": "Drug Enforcement Administration",
+      "title": "DEA And European Authorities Uncover Massive Hizballah Drug And Money Laundering Scheme",
+      "thesis": "The DEA and European authorities uncovered a massive, global drug trafficking and money laundering scheme run by Hizballah's External Security Organization Business Affairs (BAC), which uses the proceeds to purchase weapons for its activities in Syria. The investigation, part of Project Cassandra, highlights the dangerous nexus between drug trafficking and terrorism, leading to the arrest of key facilitators and concurrent U.S. Treasury sanctions.",
+      "group": "hezbollah",
+      "tier": 3,
+      "year": 2016,
+      "size": 2.0,
+      "in_degree": 0,
+      "out_degree": 1,
+      "betweenness": 0.0,
+      "centrality_score": 0.0
+    },
+    {
+      "id": "bunker2013",
+      "label": "Bunker (2013)",
+      "author": "Bunker",
+      "title": "Santa Muerte: Inspired and Ritualistic Killings",
+      "thesis": "The article examines the rise of a criminalized and dark variant of the Cult of Santa Muerte, particularly its ties to Mexican cartels and gangs, and warns U.S. law enforcement about the potential for associated inspired and ritualistic killings to cross the border into the United States.",
+      "group": "cartels",
+      "tier": 2,
+      "year": 2013,
+      "size": 2.769230769230769,
+      "in_degree": 5,
+      "out_degree": 3,
+      "betweenness": 0.0,
+      "centrality_score": 0.09615384615384616
+    },
+    {
+      "id": "state2025",
+      "label": "State (2025)",
+      "author": "State",
+      "title": "Designation of International Cartels",
+      "thesis": "The US Department of State designated eight international cartels and transnational organizations as Foreign Terrorist Organizations (FTOs) and Specially Designated Global Terrorists (SDGTs) to disrupt their financial networks and combat their campaigns of violence and terror.",
+      "group": "government",
+      "tier": 3,
+      "year": 2025,
+      "size": 2.0,
+      "in_degree": 0,
+      "out_degree": 0,
+      "betweenness": 0.0,
+      "centrality_score": 0.0
+    },
+    {
+      "id": "us_senate_caucus2025",
+      "label": "US Senate Caucus (2025)",
+      "author": "US Senate Caucus",
+      "title": "Global Gangsters: Hezbollah's Latin American Drug Trafficking Operations",
+      "thesis": "Due to a severe financial shortfall following Israeli reprisal attacks and a new Lebanese government's cooperation with the ceasefire, Hezbollah is expected to increase its reliance on criminal enterprises, particularly laundering the proceeds of narcotics trafficking in Latin America, to fill its funding gap.",
+      "group": "hezbollah",
+      "tier": 3,
+      "year": 2025,
+      "size": 2.0,
+      "in_degree": 0,
+      "out_degree": 2,
+      "betweenness": 0.0,
+      "centrality_score": 0.0
+    },
+    {
+      "id": "nationalcounterterrorismcenter2023",
+      "label": "National Counterterrorism Center (2023)",
+      "author": "National Counterterrorism Center",
+      "title": "Foreign Terrorist Organizations: Recruitment and Radicalization",
+      "thesis": "The primary threat to the U.S. homeland has shifted from complex, FTO-directed attacks to simple, self-initiated attacks by lone actors inspired by FTOs like ISIS and al-Qaeda, while the global threat remains focused on FTOs exploiting instability in regions like Africa. The U.S. counterterrorism enterprise must adapt to this diffused threat by sustaining core capabilities and integrating with broader national security priorities.",
+      "group": "terrorism",
+      "tier": 3,
+      "year": 2023,
+      "size": 2.0,
+      "in_degree": 0,
+      "out_degree": 5,
+      "betweenness": 0.0,
+      "centrality_score": 0.0
+    },
+    {
+      "id": "richardson2024",
+      "label": "Richardson (2024)",
+      "author": "Richardson",
+      "title": "Statement of General Laura J. Richardson, Commander, United States Southern Command, Before the 118th Congress, House Armed Services Committee",
+      "thesis": "Transnational Criminal Organizations (TCOs) are the primary obstacle to security and stability in Latin America and the Caribbean, fueling violence and corruption that undermines democratic governance and poses a direct threat to the American people. USSOUTHCOM estimates approximately 200 TCOs and four terrorist groups operate in the region, with groups like the Sinaloa and Jalisco New Generation Cartels co-opting legitimate government functions.",
+      "group": "cartels",
+      "tier": 2,
+      "year": 2024,
+      "size": 2.0,
+      "in_degree": 0,
+      "out_degree": 5,
+      "betweenness": 0.0,
+      "centrality_score": 0.0
+    },
+    {
+      "id": "beittel2023",
+      "label": "Beittel (2023)",
+      "author": "Beittel",
+      "title": "Mexico: Organized Crime and Drug Trafficking Organizations",
+      "thesis": "Mexican transnational criminal organizations (TCOs), commonly referred to as drug cartels and drug trafficking organizations (DTOs), significantly influence drug trafficking in the United States and pose the greatest drug trafficking threat, with their poly-criminal activities and DTO-related violence contributing to a heightened homicide rate in Mexico and affecting U.S. security.",
+      "group": "cartels",
+      "tier": 2,
+      "year": 2023,
+      "size": 2.1538461538461537,
+      "in_degree": 1,
+      "out_degree": 5,
+      "betweenness": 0.0,
+      "centrality_score": 0.019230769230769232
+    },
+    {
+      "id": "gao2022",
+      "label": "Government Accountability Office (2022)",
+      "author": "Government Accountability Office",
+      "title": "Counternarcotics: US Agencies Have Taken Steps to Address Mexican Cartel Activities",
+      "thesis": "Could not be determined as the source was not found.",
+      "group": "government",
+      "tier": 3,
+      "year": 2022,
+      "size": 2.0,
+      "in_degree": 0,
+      "out_degree": 0,
+      "betweenness": 0.0,
+      "centrality_score": 0.0
+    },
+    {
+      "id": "unodc2024",
+      "label": "United Nations Office on Drugs and Crime (2024)",
+      "author": "United Nations Office on Drugs and Crime",
+      "title": "The Nexus between Transnational Organized Crime and Terrorism in Latin America",
+      "thesis": "The report examines the evolving interactions between transnational organized crime and terrorism in Latin America, highlighting that both criminal and terrorist organizations are developing in-house capabilities and forging alliances, with criminal groups adopting terrorist tactics and terrorist groups becoming hybrid entities driven by both ideology and economic gains. This blurring of lines requires a strategic response that addresses the \"terrorist activity cycle\" and the changing motivations of actors.",
+      "group": "convergence",
+      "tier": 3,
+      "year": 2024,
+      "size": 2.0,
+      "in_degree": 0,
+      "out_degree": 9,
+      "betweenness": 0.0,
+      "centrality_score": 0.0
+    },
+    {
+      "id": "interpol2023",
+      "label": "INTERPOL (2023)",
+      "author": "INTERPOL",
+      "title": "Global Crime Trends: Convergence of Organized Crime and Terrorism",
+      "thesis": "The report highlights that global crime trends in 2023 show increased innovation, sophistication, and complexity, particularly in the convergence of different forms of crime, creating an interdependent criminal ecosystem. This includes an increase in sophisticated terror attacks and complex organizational structures for criminal syndicates.",
+      "group": "convergence",
+      "tier": 3,
+      "year": 2023,
+      "size": 2.0,
+      "in_degree": 0,
+      "out_degree": 8,
+      "betweenness": 0.0,
+      "centrality_score": 0.0
+    },
+    {
+      "id": "europol2024",
+      "label": "Europol (2024)",
+      "author": "Europol",
+      "title": "EU Terrorism Situation and Trend Report (TE-SAT)",
+      "thesis": "The 2024 report indicates an increase in terrorist attacks in the EU in 2023, with jihadist terrorism remaining the most lethal threat, and highlights the exploitation of global tensions, digital technology, and the involvement of young individuals in the evolving and fragmented threat landscape.",
+      "group": "terrorism",
+      "tier": 1,
+      "year": 2024,
+      "size": 2.0,
+      "in_degree": 0,
+      "out_degree": 2,
+      "betweenness": 0.0,
+      "centrality_score": 0.0
+    },
+    {
+      "id": "oas2022",
+      "label": "Organization of American States (2022)",
+      "author": "Organization of American States",
+      "title": "Report on Drug Supply in the Americas",
+      "thesis": "The drug supply landscape in the Americas is characterized by regional diversity in primary drugs of concern, with a notable increase in cocaine seizures in South America and a growing crisis of fentanyl and synthetic opioids in North America. The report provides a data-driven foundation for evidence-based drug policies across the Western Hemisphere.",
+      "group": "cartels",
+      "tier": 3,
+      "year": 2022,
+      "size": 2.0,
+      "in_degree": 0,
+      "out_degree": 5,
+      "betweenness": 0.0,
+      "centrality_score": 0.0
+    },
+    {
+      "id": "gerwehr_daly2006",
+      "label": "Gerwehr, Daly (2006)",
+      "author": "Gerwehr, Daly",
+      "title": "Al-Qaida: Terrorist Selection and Recruitment",
+      "thesis": "Al-Qaida and its affiliates have had to adapt their recruitment methods since the loss of their training base in Afghanistan and the post-9/11 environment, moving toward more clandestine and varied approaches. Understanding these diverse recruitment models is a critical first step for counter-terrorism strategies aimed at diminishing the group's ability to replenish its manpower.",
+      "group": "terrorism",
+      "tier": 1,
+      "year": 2006,
+      "size": 2.6153846153846154,
+      "in_degree": 4,
+      "out_degree": 0,
+      "betweenness": 0.0,
+      "centrality_score": 0.07692307692307693
+    },
+    {
+      "id": "ctc2007",
+      "label": "CTC (2007)",
+      "author": "CTC",
+      "title": "CTC Sentinel",
+      "thesis": "The CTC Sentinel provides a monthly, independent analysis from scholars and practitioners to understand and confront contemporary threats posed by terrorism, including groups like ISIS and al-Qaeda, and emerging issues such as the cartel-terror nexus. The publication serves as a key resource for policymakers and academics seeking timely, in-depth research on counterterrorism and political violence.",
+      "group": "terrorism",
+      "tier": 1,
+      "year": 2007,
+      "size": 2.6153846153846154,
+      "in_degree": 4,
+      "out_degree": 0,
+      "betweenness": 0.0,
+      "centrality_score": 0.07692307692307693
+    },
+    {
+      "id": "nationaldefenseuniversity2013",
+      "label": "NationalDefenseUniversity (2013)",
+      "author": "NationalDefenseUniversity",
+      "title": "Convergence: Illicit Networks and National Security in the Age of Globalization",
+      "thesis": "Globalization has outpaced the growth of mechanisms for global governance, leading to a lack of regulation that has created massive opportunities for criminals and has diversified and globalized organized crime. The convergence of illicit networks, including terrorists and transnational criminals, poses a significant and evolving threat to national and international security.",
+      "group": "convergence",
+      "tier": 1,
+      "year": 2013,
+      "size": 2.769230769230769,
+      "in_degree": 5,
+      "out_degree": 4,
+      "betweenness": 0.0,
+      "centrality_score": 0.09615384615384616
+    },
+    {
+      "id": "nps2022",
+      "label": "Naval Postgraduate School (2022)",
+      "author": "Naval Postgraduate School",
+      "title": "Transnational Organized Crime and Terrorism: Networks and Countermeasures",
+      "thesis": "This course material argues that the relationship between transnational organized crime (TOC) and terrorism is complex, requiring a systematic breakdown of their vulnerabilities and linkages to craft effective national and regional countermeasures. It emphasizes that TOC is increasingly viewed as a national security threat, not just a law enforcement issue, and that understanding the 'Dark Networks' that allow both to operate is crucial for developing effective strategies.",
+      "group": "convergence",
+      "tier": 3,
+      "year": 2022,
+      "size": 2.0,
+      "in_degree": 0,
+      "out_degree": 8,
+      "betweenness": 0.0,
+      "centrality_score": 0.0
+    },
+    {
+      "id": "airuniversity2020",
+      "label": "Air University (2020)",
+      "author": "Air University",
+      "title": "Journal of the Middle East and Africa: Special Issue on Extremism",
+      "thesis": "The Fall 2020 special issue of the Journal of European, Middle Eastern, & African Affairs examines the rise of extremism in the Sahel, with a particular focus on the history, organization, and methods of Jama'at Nasr al-Islam wal Muslimin (JNIM) in Mali. The articles explore the root causes of the conflict, including colonial legacies, ethnic tensions, and regional instability, to propose strategies for countering extremist groups.",
+      "group": "terrorism",
+      "tier": 3,
+      "year": 2020,
+      "size": 2.0,
+      "in_degree": 0,
+      "out_degree": 5,
+      "betweenness": 0.0,
+      "centrality_score": 0.0
+    },
+    {
+      "id": "bledsoe2025",
+      "label": "Bledsoe (2025)",
+      "author": "Bledsoe",
+      "title": "The Role of Social Media in Cartel Recruitment",
+      "thesis": "Social media and messaging platforms have transformed organized crime recruitment into a scalable and decentralized process, which cartels leverage by exploiting the economic vulnerabilities of Mexican youth and bypassing content moderation with slang and emojis. The most sustainable solution to this problem is not interdiction or censorship, but rather offline efforts by the Mexican government to foster a friendly investment environment and create job training programs for at-risk youth.",
+      "group": "cartels",
+      "tier": 3,
+      "year": 2025,
+      "size": 2.1538461538461537,
+      "in_degree": 1,
+      "out_degree": 6,
+      "betweenness": 0.0,
+      "centrality_score": 0.019230769230769232
+    },
+    {
+      "id": "crisisgroup2024",
+      "label": "Crisis Group (2024)",
+      "author": "Crisis Group",
+      "title": "Fear, Lies and Lucre: How Criminal Groups Weaponise Social Media in Mexico",
+      "thesis": "Criminal groups in Mexico extensively weaponize social media to spread propaganda, intimidate rivals, recruit members, and coordinate violence. Platforms struggle to effectively moderate this content, creating an information vacuum that endangers civilians and journalists.",
+      "group": "cartels",
+      "tier": 3,
+      "year": 2024,
+      "size": 2.3076923076923075,
+      "in_degree": 2,
+      "out_degree": 5,
+      "betweenness": 0.0,
+      "centrality_score": 0.038461538461538464
+    },
+    {
+      "id": "chomczynski2023",
+      "label": "Chomczyński, Guy, Azaola (2023)",
+      "author": "Chomczyński, Guy, Azaola",
+      "title": "Beyond money, power, and masculinity: Toward an analytical perspective on recruitment to Mexican drug trafficking organizations",
+      "thesis": "Recruits into Mexican drug trafficking organizations are motivated by aspirations of financial success and notions of masculinity, but are also heavily influenced by attachment to social groups and jointly shared experiences, which the authors term a 'collective trajectory'. The decision to join is therefore viewed in collective terms, connected to the immediate social group.",
+      "group": "cartels",
+      "tier": 3,
+      "year": 2023,
+      "size": 7.076923076923077,
+      "in_degree": 7,
+      "out_degree": 11,
+      "betweenness": 11.0,
+      "centrality_score": 0.6346153846153846
+    },
+    {
+      "id": "brookingsinstitution2024",
+      "label": "Brookings Institution (2024)",
+      "author": "Brookings Institution",
+      "title": "The Evolution of Terrorist Recruitment in the Digital Age",
+      "thesis": "The digital age has fundamentally altered terrorist recruitment, shifting from traditional, direct methods to sophisticated online strategies that leverage social media, gaming platforms, and emerging technologies like AI to radicalize and recruit a global audience. This evolution necessitates a corresponding adaptation in counter-terrorism policies and digital governance.",
+      "group": "terrorism",
+      "tier": 3,
+      "year": 2024,
+      "size": 2.0,
+      "in_degree": 0,
+      "out_degree": 5,
+      "betweenness": 0.0,
+      "centrality_score": 0.0
+    },
+    {
+      "id": "carnegieendowment2023",
+      "label": "Carnegie Endowment (2023)",
+      "author": "Carnegie Endowment",
+      "title": "Transnational Crime and Terrorism: The Latin American Connection",
+      "thesis": "The convergence of transnational organized crime and terrorism in Latin America poses a significant and growing threat to regional and international security, necessitating a coordinated policy response to address the complex connections between criminal and extremist groups.",
+      "group": "convergence",
+      "tier": 3,
+      "year": 2023,
+      "size": 2.0,
+      "in_degree": 0,
+      "out_degree": 8,
+      "betweenness": 0.0,
+      "centrality_score": 0.0
+    },
+    {
+      "id": "cfr2024",
+      "label": "CFR (2024)",
+      "author": "CFR",
+      "title": "Mexico’s Long War: Drugs, Crime, and the Cartels",
+      "thesis": "The long-running war against Mexican drug cartels has failed to curb their power, leading to fragmentation, increased violence, and a shift in focus from kingpin strategies to addressing socioeconomic drivers, while the cartels continue to exploit corruption and expand their poly-criminal activities.",
+      "group": "cartels",
+      "tier": 3,
+      "year": 2024,
+      "size": 2.0,
+      "in_degree": 0,
+      "out_degree": 5,
+      "betweenness": 0.0,
+      "centrality_score": 0.0
+    },
+    {
+      "id": "atlanticcouncil2023",
+      "label": "Atlantic Council (2023)",
+      "author": "Atlantic Council",
+      "title": "Digital Propaganda: How Extremist Groups Recruit Online",
+      "thesis": "Extremist groups are increasingly leveraging digital platforms and propaganda techniques to recruit and radicalize individuals online, necessitating a coordinated counter-strategy to mitigate this evolving threat.",
+      "group": "terrorism",
+      "tier": 3,
+      "year": 2023,
+      "size": 2.0,
+      "in_degree": 0,
+      "out_degree": 5,
+      "betweenness": 0.0,
+      "centrality_score": 0.0
+    },
+    {
+      "id": "stimson2024",
+      "label": "Stimson Center (2024)",
+      "author": "Stimson Center",
+      "title": "The Crime-Terror Nexus in Latin America",
+      "thesis": "The report analyzes the evolving convergence between transnational organized crime and terrorist groups in Latin America, arguing that these illicit networks pose a significant and complex threat to regional stability and U.S. security interests.",
+      "group": "convergence",
+      "tier": 3,
+      "year": 2024,
+      "size": 2.0,
+      "in_degree": 0,
+      "out_degree": 9,
+      "betweenness": 0.0,
+      "centrality_score": 0.0
+    },
+    {
+      "id": "chomczynski2023",
+      "label": "Chomczyński, Guy, Azaola (2023)",
+      "author": "Chomczyński, Guy, Azaola",
+      "title": "Beyond money, power, and masculinity: Toward an analytical perspective on recruitment to Mexican drug trafficking organizations",
+      "thesis": "Recruitment into Mexican DTOs is a multifaceted process that, in addition to financial and masculine aspirations, is significantly influenced by attachment to social groups and jointly shared experiences, which the authors term a \"collective trajectory.\" This perspective argues that individual decisions to join are viewed in collective terms, connecting the recruit with members of their immediate social group.",
+      "group": "cartels",
+      "tier": 3,
+      "year": 2023,
+      "size": 7.076923076923077,
+      "in_degree": 7,
+      "out_degree": 11,
+      "betweenness": 11.0,
+      "centrality_score": 0.6346153846153846
+    },
+    {
+      "id": "meza2019",
+      "label": "Meza (2019)",
+      "author": "Meza",
+      "title": "Jalisco Cartel Training Camp in Mexico: A Glimpse into CJNG's Military Model",
+      "thesis": "The CJNG employs a brutal, militaristic model of forced recruitment and training, utilizing extreme violence and cannibalistic practices to desensitize new members and establish a terrifying military-style force that underpins its territorial and international expansion.",
+      "group": "cartels",
+      "tier": 3,
+      "year": 2019,
+      "size": 2.0,
+      "in_degree": 0,
+      "out_degree": 3,
+      "betweenness": 0.0,
+      "centrality_score": 0.0
+    },
+    {
+      "id": "insightcrime2024",
+      "label": "InSight Crime (2024)",
+      "author": "InSight Crime",
+      "title": "Los Zetas: Evolution and Recruitment Strategies",
+      "thesis": "Los Zetas, once a powerful and feared criminal group, has fragmented into smaller, localized factions that now rely more on profiting from local crime in their territories than on transnational drug trafficking.",
+      "group": "cartels",
+      "tier": 3,
+      "year": 2024,
+      "size": 2.0,
+      "in_degree": 0,
+      "out_degree": 6,
+      "betweenness": 0.0,
+      "centrality_score": 0.0
+    },
+    {
+      "id": "iiss2023",
+      "label": "IISS (2023)",
+      "author": "IISS",
+      "title": "Armed Conflict Survey: Latin America",
+      "thesis": "The armed conflict landscape in Latin America is increasingly shaped by criminal dynamics, with a focus on the shifting nature of illicit markets, the expansion of criminal organizations like Mexican cartels, and the resulting new conflict zones and security challenges across the region.",
+      "group": "cartels",
+      "tier": 3,
+      "year": 2023,
+      "size": 2.0,
+      "in_degree": 0,
+      "out_degree": 4,
+      "betweenness": 0.0,
+      "centrality_score": 0.0
+    },
+    {
+      "id": "wilbur2025",
+      "label": "Wilbur (2025)",
+      "author": "Wilbur",
+      "title": "Employing Information Operations to Challenge Cartel (Narcocultura) Derived Santa Muerte Propaganda",
+      "thesis": "The appropriation of Santa Muerte by drug cartels as a propaganda tool cannot be ignored and must be countered with information operations that exploit the symbolic system's vulnerabilities, such as its lack of a coherent theology and its inability to grant favors, to mitigate its narco propaganda potential.",
+      "group": "cartels",
+      "tier": 3,
+      "year": 2025,
+      "size": 2.0,
+      "in_degree": 0,
+      "out_degree": 6,
+      "betweenness": 0.0,
+      "centrality_score": 0.0
+    },
+    {
+      "id": "muggah2020",
+      "label": "Muggah, Francisco (2020)",
+      "author": "Muggah, Francisco",
+      "title": "Drug Cartels Are All Over Instagram, Facebook, and TikTok",
+      "thesis": "Latin American criminal organizations, including drug cartels, have fully embraced mainstream social media platforms like Instagram, Facebook, and TikTok to spread narco-culture, recruit new members, and conduct illicit activities, demonstrating a critical shift in their operational methods. This digital presence not only helps them project power but also leaves digital breadcrumbs that can lead to their capture.",
+      "group": "cartels",
+      "tier": 2,
+      "year": 2020,
+      "size": 2.3076923076923075,
+      "in_degree": 2,
+      "out_degree": 5,
+      "betweenness": 0.0,
+      "centrality_score": 0.038461538461538464
+    },
+    {
+      "id": "prietocuriel2023",
+      "label": "Prieto-Curiel, Campedelli, Hope (2023)",
+      "author": "Prieto-Curiel, Campedelli, Hope",
+      "title": "Reducing cartel recruitment is the only way to lower violence in Mexico",
+      "thesis": "Cartels in Mexico are one of the country's top employers, requiring high weekly recruitment to offset losses from conflict and incapacitation. Increasing incapacitation would increase violence and cartel size, while reducing recruitment is the only effective policy to substantially curtail violence and lower cartel size.",
+      "group": "cartels",
+      "tier": 2,
+      "year": 2023,
+      "size": 6.559440559440559,
+      "in_degree": 6,
+      "out_degree": 10,
+      "betweenness": 10.0,
+      "centrality_score": 0.5699300699300699
+    },
+    {
+      "id": "schmitz2025",
+      "label": "Schmitz, Galeana, Culver, Contreras (2025)",
+      "author": "Schmitz, Galeana, Culver, Contreras",
+      "title": "Inside the cartel networks recruiting young Americans on social media",
+      "thesis": "Mexican drug cartels, primarily the Sinaloa Cartel, are leveraging social media platforms to successfully recruit young American citizens for migrant and drug smuggling operations within the US, creating a new challenge for law enforcement.",
+      "group": "cartels",
+      "tier": 2,
+      "year": 2025,
+      "size": 2.0,
+      "in_degree": 0,
+      "out_degree": 5,
+      "betweenness": 0.0,
+      "centrality_score": 0.0
+    },
+    {
+      "id": "solis2024",
+      "label": "Solis (2024)",
+      "author": "Solis",
+      "title": "Cartels increasingly use young US citizens for fentanyl smuggling",
+      "thesis": "Mexican drug cartels are increasingly recruiting young U.S. citizens, including high school and college students, to smuggle fentanyl across the border at legal ports of entry, exploiting their clean records and financial hardship with minimal payment. This method is preferred over using undocumented migrants, as U.S. citizens account for the vast majority of fentanyl smuggling arrests.",
+      "group": "journalism",
+      "tier": 3,
+      "year": 2024,
+      "size": 2.0,
+      "in_degree": 0,
+      "out_degree": 1,
+      "betweenness": 0.0,
+      "centrality_score": 0.0
+    },
+    {
+      "id": "pannell2025",
+      "label": "Pannell (2025)",
+      "author": "Pannell",
+      "title": "'Never touched a gun': Colombia fighters step up child soldier recruitment",
+      "thesis": "The collapse of ceasefires and dialogues in Colombia has led to a surge in child recruitment by armed and criminal groups, who use coercion and false promises to bolster their ranks, creating a severe humanitarian crisis.",
+      "group": "journalism",
+      "tier": 3,
+      "year": 2025,
+      "size": 2.0,
+      "in_degree": 0,
+      "out_degree": 1,
+      "betweenness": 0.0,
+      "centrality_score": 0.0
+    },
+    {
+      "id": "diaz2023",
+      "label": "Díaz (2023)",
+      "author": "Díaz",
+      "title": "The battle against forced recruitment in Colombia",
+      "thesis": "The article details the worsening crisis of forced recruitment of minors, some as young as 11, by FARC dissidents (Jaime Martínez column) and the ELN in Colombia, particularly in the Cauca Valley, and highlights the efforts of Indigenous communities to protect their children.",
+      "group": "convergence",
+      "tier": 3,
+      "year": 2023,
+      "size": 2.0,
+      "in_degree": 0,
+      "out_degree": 8,
+      "betweenness": 0.0,
+      "centrality_score": 0.0
+    },
+    {
+      "id": "kitroeff2024",
+      "label": "Kitroeff, Gebeloff (2024)",
+      "author": "Kitroeff, Gebeloff",
+      "title": "The American Drug Mules Smuggling Fentanyl Into the U.S.",
+      "thesis": "Mexican drug cartels are leveraging social media and the ease of crossing for U.S. citizens to recruit thousands of Americans to act as drug mules, primarily smuggling fentanyl through legal ports of entry.",
+      "group": "cartels",
+      "tier": 3,
+      "year": 2024,
+      "size": 2.0,
+      "in_degree": 0,
+      "out_degree": 4,
+      "betweenness": 0.0,
+      "centrality_score": 0.0
+    },
+    {
+      "id": "washingtonpost2023",
+      "label": "Washington Post (2023)",
+      "author": "Washington Post",
+      "title": "Inside the Sinaloa Cartel's Recruitment Machine",
+      "thesis": "The Sinaloa Cartel employs sophisticated and often coercive methods, including social media and false promises, to recruit new members, particularly vulnerable youth, as a core strategy for maintaining its operational capacity and territorial control in Mexico.",
+      "group": "cartels",
+      "tier": 2,
+      "year": 2023,
+      "size": 2.1538461538461537,
+      "in_degree": 1,
+      "out_degree": 7,
+      "betweenness": 0.0,
+      "centrality_score": 0.019230769230769232
+    },
+    {
+      "id": "guardian2024",
+      "label": "Guardian (2024)",
+      "author": "Guardian",
+      "title": "ISIS Recruitment Tactics: Lessons for Counter-Terrorism",
+      "thesis": "The article posits that the degradation of ISIS's central caliphate is offset by the success of its regional affiliates, which are now serving as a launchpad for a new wave of external operations and extremist violence against Western targets. This shift necessitates a re-evaluation of current counter-terrorism strategies to address the enhanced status and sophisticated communication networks of these affiliates.",
+      "group": "terrorism",
+      "tier": 3,
+      "year": 2024,
+      "size": 2.0,
+      "in_degree": 0,
+      "out_degree": 5,
+      "betweenness": 0.0,
+      "centrality_score": 0.0
+    },
+    {
+      "id": "bbc2023",
+      "label": "BBC (2023)",
+      "author": "BBC",
+      "title": "How Drug Cartels Use TikTok to Recruit",
+      "thesis": "Drug cartels are increasingly using social media platforms like TikTok to recruit vulnerable individuals, particularly teenagers, by glamorizing cartel life and offering false promises of wealth and power.",
+      "group": "cartels",
+      "tier": 3,
+      "year": 2023,
+      "size": 2.0,
+      "in_degree": 0,
+      "out_degree": 6,
+      "betweenness": 0.0,
+      "centrality_score": 0.0
+    },
+    {
+      "id": "vice_news2024",
+      "label": "Vice News (2024)",
+      "author": "Vice News",
+      "title": "Inside Mexico's Cartel Training Camps",
+      "thesis": "Mexican cartels operate \"Schools of Terror\" to forcibly recruit and groom young members into ruthless killers through a twisted curriculum of bloody initiations, torture, and forced cannibalism, a tactic used to ensure loyalty and project power.",
+      "group": "journalism",
+      "tier": 3,
+      "year": 2024,
+      "size": 2.0,
+      "in_degree": 0,
+      "out_degree": 1,
+      "betweenness": 0.0,
+      "centrality_score": 0.0
+    },
+    {
+      "id": "propublica2020",
+      "label": "ProPublica (2020)",
+      "author": "ProPublica",
+      "title": "The Cartel Project: How DTOs Recruit and Retain Members",
+      "thesis": "Drug Trafficking Organizations (DTOs) employ sophisticated, often violent, methods of recruitment and retention, including leveraging political connections and exploiting vulnerable populations, to maintain their global criminal networks.",
+      "group": "journalism",
+      "tier": 1,
+      "year": 2020,
+      "size": 2.9230769230769234,
+      "in_degree": 6,
+      "out_degree": 1,
+      "betweenness": 0.0,
+      "centrality_score": 0.11538461538461539
+    },
+    {
+      "id": "reuters2024",
+      "label": "Reuters (2024)",
+      "author": "Reuters",
+      "title": "Special Report: Mexico's cartels target youth with social media blitz",
+      "thesis": "Mexican cartels have adopted a strategic \"social media blitz\" to target and recruit youth, transforming their recruitment process into a scalable and decentralized operation that exploits digital platforms.",
+      "group": "cartels",
+      "tier": 3,
+      "year": 2024,
+      "size": 2.0,
+      "in_degree": 0,
+      "out_degree": 5,
+      "betweenness": 0.0,
+      "centrality_score": 0.0
+    },
+    {
+      "id": "associatedpress2023",
+      "label": "Associated Press (2023)",
+      "author": "Associated Press",
+      "title": "Mexican cartels using social media to recruit US teens as drug mules",
+      "thesis": "Mexican drug cartels are increasingly using social media platforms like TikTok and Snapchat to recruit American teenagers to act as drug and human smugglers across the U.S. border, often by offering easy money for what is disguised as a simple driving job. This recruitment tactic has led to a rise in arrests of young Americans and is a growing concern for U.S. law enforcement agencies like the DEA and Homeland Security.",
+      "group": "journalism",
+      "tier": 3,
+      "year": 2023,
+      "size": 2.0,
+      "in_degree": 0,
+      "out_degree": 1,
+      "betweenness": 0.0,
+      "centrality_score": 0.0
+    },
+    {
+      "id": "proceso2024",
+      "label": "Proceso (2024)",
+      "author": "Proceso",
+      "title": "La estrategia de reclutamiento del CJNG",
+      "thesis": "The CJNG employs a multi-faceted recruitment strategy that includes deceptive job offers, forced recruitment of vulnerable youth, and the use of social media platforms to lure new members, which contributes significantly to the cartel's expansion and the ongoing violence in Mexico.",
+      "group": "cartels",
+      "tier": 3,
+      "year": 2024,
+      "size": 2.0,
+      "in_degree": 0,
+      "out_degree": 6,
+      "betweenness": 0.0,
+      "centrality_score": 0.0
+    },
+    {
+      "id": "reforma2023",
+      "label": "Reforma (2023)",
+      "author": "Reforma",
+      "title": "Cárteles mexicanos: La nueva cara del reclutamiento",
+      "thesis": "Mexican cartels are adopting new and more sophisticated recruitment tactics, often leveraging social media and targeting vulnerable populations, which represents a significant shift in their operational methods.",
+      "group": "journalism",
+      "tier": 3,
+      "year": 2023,
+      "size": 2.0,
+      "in_degree": 0,
+      "out_degree": 3,
+      "betweenness": 0.0,
+      "centrality_score": 0.0
+    },
+    {
+      "id": "martinez2025",
+      "label": "Martinez (2025)",
+      "author": "Martinez",
+      "title": "Redes sociales: El nuevo campo de batalla de los cárteles",
+      "thesis": "Mexican drug cartels have transformed social media platforms like TikTok and Instagram into a new operational domain for propaganda, recruitment, and the sale of narcotics, moving beyond traditional street operations to dominate the digital space.",
+      "group": "cartels",
+      "tier": 3,
+      "year": 2025,
+      "size": 2.0,
+      "in_degree": 0,
+      "out_degree": 5,
+      "betweenness": 0.0,
+      "centrality_score": 0.0
+    },
+    {
+      "id": "eltiempo2023",
+      "label": "El Tiempo (2023)",
+      "author": "El Tiempo",
+      "title": "Reclutamiento forzado en Colombia: Una crisis silenciosa",
+      "thesis": "Forced recruitment of children and adolescents in Colombia by illegal armed groups constitutes a silent and persistent humanitarian crisis that is not receiving the necessary attention from the public or the government.",
+      "group": "journalism",
+      "tier": 3,
+      "year": 2023,
+      "size": 2.0,
+      "in_degree": 0,
+      "out_degree": 1,
+      "betweenness": 0.0,
+      "centrality_score": 0.0
+    },
+    {
+      "id": "semana2024",
+      "label": "Semana (2024)",
+      "author": "Semana",
+      "title": "Aumentó el reclutamiento ilegal en Colombia: grupos armados se llevaron a más menores para la guerra en 2024",
+      "thesis": "Illegal armed groups in Colombia, including FARC dissidents, ELN, and Clan del Golfo, significantly increased the forced recruitment of minors in 2024, using false promises and social media deception to target children, especially those from indigenous and Afro-Colombian communities.",
+      "group": "cartels",
+      "tier": 3,
+      "year": 2024,
+      "size": 2.0,
+      "in_degree": 0,
+      "out_degree": 5,
+      "betweenness": 0.0,
+      "centrality_score": 0.0
+    },
+    {
+      "id": "activefence2025",
+      "label": "Sharma (2025)",
+      "author": "Sharma",
+      "title": "From Hitmen to Human Trafficking: How Cartels Exploit Digital Platforms",
+      "thesis": "Latin American cartels are weaponizing online platforms for recruitment (of hitmen, minors, and women for trafficking) and glorification, necessitating a shift from reactive to proactive, research-driven detection strategies by online platforms.",
+      "group": "cartels",
+      "tier": 3,
+      "year": 2025,
+      "size": 2.0,
+      "in_degree": 0,
+      "out_degree": 4,
+      "betweenness": 0.0,
+      "centrality_score": 0.0
+    },
+    {
+      "id": "cognyte2025",
+      "label": "Cognyte (2025)",
+      "author": "Cognyte",
+      "title": "Criminal Gangs Go Digital: The Challenge for Law Enforcement",
+      "thesis": "Criminal gangs are increasingly leveraging digital platforms, encrypted apps, and AI to scale a wide range of transnational criminal activities, which presents a significant challenge to law enforcement agencies that must adopt new, intelligence-driven investigative strategies to keep pace.",
+      "group": "convergence",
+      "tier": 3,
+      "year": 2025,
+      "size": 2.0,
+      "in_degree": 0,
+      "out_degree": 9,
+      "betweenness": 0.0,
+      "centrality_score": 0.0
+    },
+    {
+      "id": "techagainstterrorism2024",
+      "label": "Tech Against Terrorism (2024)",
+      "author": "Tech Against Terrorism",
+      "title": "MAPPING FAR-RIGHT TERRORIST PROPAGANDA ONLINE",
+      "thesis": "This report evaluates the distribution of far-right terrorist propaganda across online platforms between 2021 and 2023, analyzing the types of propaganda, the platforms used, and the effectiveness of content moderation in order to provide recommendations for improved mitigation strategies.",
+      "group": "terrorism",
+      "tier": 3,
+      "year": 2024,
+      "size": 2.0,
+      "in_degree": 0,
+      "out_degree": 5,
+      "betweenness": 0.0,
+      "centrality_score": 0.0
+    },
+    {
+      "id": "meta2024",
+      "label": "Meta Transparency Center (2024)",
+      "author": "Meta Transparency Center",
+      "title": "Community Standards Enforcement Report: Organized Crime Content",
+      "thesis": "This report provides quantitative metrics on the volume of content related to organized crime that was removed from Meta's platforms (Facebook and Instagram) and details the effectiveness of the company's proactive enforcement technologies in detecting and actioning this content.",
+      "group": "cartels",
+      "tier": 2,
+      "year": 2024,
+      "size": 2.1538461538461537,
+      "in_degree": 1,
+      "out_degree": 5,
+      "betweenness": 0.0,
+      "centrality_score": 0.019230769230769232
+    },
+    {
+      "id": "tiktok_safety2023",
+      "label": "TikTok (2023)",
+      "author": "TikTok",
+      "title": "Combating Organized Crime Content on TikTok",
+      "thesis": "TikTok details its zero-tolerance policy and multi-pronged strategy, including automated and human moderation, to proactively detect and remove content that promotes or facilitates organized crime and criminal activities on its platform.",
+      "group": "cartels",
+      "tier": 3,
+      "year": 2023,
+      "size": 2.0,
+      "in_degree": 0,
+      "out_degree": 5,
+      "betweenness": 0.0,
+      "centrality_score": 0.0
+    },
+    {
+      "id": "telegram2024",
+      "label": "Telegram (2024)",
+      "author": "Telegram",
+      "title": "Countering Extremism and Criminal Activity",
+      "thesis": "Telegram's moderation strategy is a combination of user reports, proactive monitoring, and advanced AI tools, which has resulted in the blocking of tens of millions of pieces of content and hundreds of thousands of groups related to terrorism, child sexual abuse material (CSAM), and other illegal activities, with a significant scaling of anti-terrorism efforts since 2022.",
+      "group": "terrorism",
+      "tier": 3,
+      "year": 2024,
+      "size": 2.0,
+      "in_degree": 0,
+      "out_degree": 5,
+      "betweenness": 0.0,
+      "centrality_score": 0.0
+    },
+    {
+      "id": "techstream2024",
+      "label": "TechStream (2024)",
+      "author": "TechStream",
+      "title": "How cartels weaponize social media for recruitment",
+      "thesis": "Mexican criminal groups use social media to intimidate rivals, garner public support, glorify narco-culture, and coordinate violence. Social media platforms struggle to moderate this content, creating a dangerous information environment where it's difficult to distinguish between propaganda and citizen journalism, especially in areas where traditional journalists cannot safely report.",
+      "group": "cartels",
+      "tier": 3,
+      "year": 2024,
+      "size": 2.0,
+      "in_degree": 0,
+      "out_degree": 5,
+      "betweenness": 0.0,
+      "centrality_score": 0.0
+    },
+    {
+      "id": "mittechnologyreview2023",
+      "label": "MIT Technology Review (2023)",
+      "author": "MIT Technology Review",
+      "title": "The algorithms helping cartels recruit on social media",
+      "thesis": "Social media algorithms, by promoting and targeting content, inadvertently assist cartels in recruiting new members, particularly for human smuggling operations, by connecting them with vulnerable individuals.",
+      "group": "cartels",
+      "tier": 3,
+      "year": 2023,
+      "size": 2.0,
+      "in_degree": 0,
+      "out_degree": 6,
+      "betweenness": 0.0,
+      "centrality_score": 0.0
+    },
+    {
+      "id": "busby2024",
+      "label": "Busby (2024)",
+      "author": "Busby",
+      "title": "Drug Dealers Have Moved on to Social Media",
+      "thesis": "The marketing and sale of illegal drugs are increasingly moving from the dark web to open social media platforms, with dealers using coded emojis and other tactics to evade detection. This shift is noted by authorities as a growing trend that extends the reach of major cartels directly to drug users.",
+      "group": "cartels",
+      "tier": 3,
+      "year": 2024,
+      "size": 2.0,
+      "in_degree": 0,
+      "out_degree": 6,
+      "betweenness": 0.0,
+      "centrality_score": 0.0
+    },
+    {
+      "id": "theverge2023",
+      "label": "The Verge (2023)",
+      "author": "The Verge",
+      "title": "How TikTok became a recruiting tool for Mexican cartels",
+      "thesis": "Mexican cartels are leveraging the global reach and youth-centric nature of the social media platform TikTok to glamorize their lifestyle and actively recruit new members, particularly from vulnerable populations. This digital recruitment strategy bypasses traditional methods and poses a significant challenge to law enforcement and platform moderation efforts.",
+      "group": "cartels",
+      "tier": 3,
+      "year": 2023,
+      "size": 2.0,
+      "in_degree": 0,
+      "out_degree": 6,
+      "betweenness": 0.0,
+      "centrality_score": 0.0
+    },
+    {
+      "id": "hrw2024",
+      "label": "Human Rights Watch (2024)",
+      "author": "Human Rights Watch",
+      "title": "Recruitment of Child Soldiers in Colombia and Mexico",
+      "thesis": "Despite peace efforts, armed groups in Colombia continue to recruit and use child soldiers, while in Mexico, children, particularly migrants and asylum seekers, remain highly vulnerable to recruitment and exploitation by criminal organizations.",
+      "group": "convergence",
+      "tier": 2,
+      "year": 2024,
+      "size": 2.0,
+      "in_degree": 0,
+      "out_degree": 9,
+      "betweenness": 0.0,
+      "centrality_score": 0.0
+    },
+    {
+      "id": "amnestyinternational2023",
+      "label": "Amnesty International (2023)",
+      "author": "Amnesty International",
+      "title": "Forced Recruitment by Armed Groups in Latin America",
+      "thesis": "Armed groups in Latin America, particularly in Colombia, continue to violate international humanitarian law through tactics like forced confinement and child recruitment, with Indigenous and Afro-descendant communities disproportionately affected, despite government peace efforts.",
+      "group": "terrorism",
+      "tier": 3,
+      "year": 2023,
+      "size": 2.0,
+      "in_degree": 0,
+      "out_degree": 5,
+      "betweenness": 0.0,
+      "centrality_score": 0.0
+    },
+    {
+      "id": "bamber-zryd2024",
+      "label": "Bamber-Zryd (2024)",
+      "author": "Bamber-Zryd",
+      "title": "ICRC engagement with armed groups in 2024",
+      "thesis": "The ICRC's engagement with armed groups remains stable but is increasingly complicated by state-imposed barriers, particularly counter-terrorism legislation, which negatively impacts humanitarian access to 210 million people living under armed group control. The report emphasizes the humanitarian imperative of continued, confidential dialogue with armed groups to promote IHL compliance and provide aid.",
+      "group": "terrorism",
+      "tier": 3,
+      "year": 2024,
+      "size": 2.0,
+      "in_degree": 0,
+      "out_degree": 5,
+      "betweenness": 0.0,
+      "centrality_score": 0.0
+    },
+    {
+      "id": "daniel2023",
+      "label": "Daniel, MacLeod, Aparac, Kwaja, Couto (2023)",
+      "author": "Daniel, MacLeod, Aparac, Kwaja, Couto",
+      "title": "Recruitment, including predatory recruitment, of mercenaries and mercenary-related actors: Report of the Working Group on the use of mercenaries as a means of violating human rights and impeding the exercise of the right of peoples to self-determination",
+      "thesis": "The report highlights the increasing use of mercenaries and mercenary-related actors in conflict zones, which intensifies human rights abuses and undermines peace efforts, and urges States to address the root causes of predatory recruitment to tackle the scourge of mercenarism.",
+      "group": "government",
+      "tier": 3,
+      "year": 2023,
+      "size": 2.0,
+      "in_degree": 0,
+      "out_degree": 0,
+      "betweenness": 0.0,
+      "centrality_score": 0.0
+    },
+    {
+      "id": "coalitiontostoptheuseofchildsoldiers2024",
+      "label": "Coalition to Stop the Use of Child Soldiers (2024)",
+      "author": "Coalition to Stop the Use of Child Soldiers",
+      "title": "Global Report on Child Soldiers",
+      "thesis": "The 2024 Global Report on Child Soldiers details the horrific conditions faced by children forced into armed conflict, highlighting the ongoing recruitment and use of child soldiers despite international agreements. The report calls for greater accountability for violating countries and more effective enforcement of protective legislation like the Child Soldiers Prevention Act.",
+      "group": "government",
+      "tier": 3,
+      "year": 2024,
+      "size": 2.0,
+      "in_degree": 0,
+      "out_degree": 0,
+      "betweenness": 0.0,
+      "centrality_score": 0.0
+    },
+    {
+      "id": "grillo2011",
+      "label": "Grillo (2011)",
+      "author": "Grillo",
+      "title": "El Narco: Inside Mexico's Criminal Insurgency",
+      "thesis": "The Mexican drug cartels have evolved from simple drug-smuggling operations into a complex, ultraviolent criminal insurgency, fundamentally challenging the Mexican state and transforming large areas of the country into a combat zone.",
+      "group": "cartels",
+      "tier": 1,
+      "year": 2011,
+      "size": 3.5384615384615383,
+      "in_degree": 10,
+      "out_degree": 0,
+      "betweenness": 0.0,
+      "centrality_score": 0.19230769230769232
+    },
+    {
+      "id": "grillo2016",
+      "label": "Grillo (2016)",
+      "author": "Grillo",
+      "title": "Gangster Warlords: Drug Dollars, Killing Fields, and the New Politics of Latin America",
+      "thesis": "The book argues that Latin America's post-Cold War criminal organizations have evolved into \"gangster warlords\"—hybrid leaders who combine the tactics of a criminal CEO, paramilitary general, and rock star to control fiefdoms and challenge the state's monopoly on violence.",
+      "group": "cartels",
+      "tier": 1,
+      "year": 2016,
+      "size": 5.3426573426573425,
+      "in_degree": 17,
+      "out_degree": 1,
+      "betweenness": 2.0,
+      "centrality_score": 0.4178321678321678
+    },
+    {
+      "id": "bunker2010",
+      "label": "Bunker, Sullivan (2010)",
+      "author": "Bunker, Sullivan",
+      "title": "Studies in Gangs and Cartels",
+      "thesis": "This anthology introduces the \"third generation gangs\" and \"third phase cartel\" typologies, arguing that these criminal organizations have evolved beyond traditional crime to possess political, mercenary, and state-challenging capacities, posing a national security threat. The work advocates for a new framework to understand the convergence of organized crime and insurgency.",
+      "group": "cartels",
+      "tier": 2,
+      "year": 2010,
+      "size": 2.825174825174825,
+      "in_degree": 3,
+      "out_degree": 4,
+      "betweenness": 1.0,
+      "centrality_score": 0.10314685314685315
+    },
+    {
+      "id": "grayson2010",
+      "label": "Grayson (2010)",
+      "author": "Grayson",
+      "title": "Mexico: Narco-Violence and a Failed State?",
+      "thesis": "The book examines the emergence and impact of narco-violence and drug cartels in Mexico, arguing that the country's state strength is diminishing, which raises the possibility of Mexico becoming a failed state. It analyzes the historical context, the government's anti-drug strategy, and the effect of these issues on U.S.-Mexican relations.",
+      "group": "cartels",
+      "tier": 1,
+      "year": 2010,
+      "size": 4.923076923076923,
+      "in_degree": 19,
+      "out_degree": 0,
+      "betweenness": 0.0,
+      "centrality_score": 0.36538461538461536
+    },
+    {
+      "id": "correa-cabrera2017",
+      "label": "Correa-Cabrera (2017)",
+      "author": "Correa-Cabrera",
+      "title": "Los Zetas Inc.: Criminal Corporations, Energy, and Civil War in Mexico",
+      "thesis": "The Zetas criminal organization is a new phenomenon that functions as a transnational corporation, engaging in diverse illicit businesses beyond drug trafficking, and its conflict with the Mexican state resembles a civil war whose beneficiaries include corporate capital and the US border security complex.",
+      "group": "cartels",
+      "tier": 1,
+      "year": 2017,
+      "size": 3.6923076923076925,
+      "in_degree": 11,
+      "out_degree": 0,
+      "betweenness": 0.0,
+      "centrality_score": 0.21153846153846154
+    },
+    {
+      "id": "kenney2007",
+      "label": "Kenney (2007)",
+      "author": "Kenney",
+      "title": "From Pablo to Osama: Trafficking and Terrorist Networks, Government Bureaucracies, and Competitive Adaptation",
+      "thesis": "The resilience of illicit enterprises like drug cartels and terrorist networks stems from their ability to \"learn\" and adapt competitively to law enforcement efforts, a process best understood through the lens of organizational learning theory. Success in counter-efforts requires conquering \"competency traps\" that favor repetitive, militarized strategies over adaptive, knowledge-based responses.",
+      "group": "convergence",
+      "tier": 1,
+      "year": 2007,
+      "size": 3.5524475524475525,
+      "in_degree": 3,
+      "out_degree": 4,
+      "betweenness": 3.0,
+      "centrality_score": 0.19405594405594406
+    },
+    {
+      "id": "sageman2004",
+      "label": "Sageman (2004)",
+      "author": "Sageman",
+      "title": "Understanding Terror Networks",
+      "thesis": "The core argument is that Islamic terrorism, particularly the global Salafi jihad, is driven by social networks and bonds of friendship among alienated young Muslims, rather than by poverty, madness, or ignorance. The book analyzes biographical data of 172 jihadists to show that social ties precede ideological commitment, which contributes to the movement's flexibility and longevity.",
+      "group": "terrorism",
+      "tier": 1,
+      "year": 2004,
+      "size": 4.153846153846153,
+      "in_degree": 14,
+      "out_degree": 0,
+      "betweenness": 0.0,
+      "centrality_score": 0.2692307692307692
+    },
+    {
+      "id": "sageman2008",
+      "label": "Sageman (2008)",
+      "author": "Sageman",
+      "title": "Leaderless Jihad: Terror Networks in the Twenty-First Century",
+      "thesis": "Al Qaeda is no longer a central organizing force but a source of inspiration for independent local groups, leading to a 'leaderless jihad' that emerges through a four-step process of radicalization.",
+      "group": "terrorism",
+      "tier": 1,
+      "year": 2008,
+      "size": 6.489510489510489,
+      "in_degree": 15,
+      "out_degree": 1,
+      "betweenness": 6.0,
+      "centrality_score": 0.5611888111888111
+    },
+    {
+      "id": "hoffman2017",
+      "label": "Hoffman (2017)",
+      "author": "Hoffman",
+      "title": "Inside Terrorism",
+      "thesis": "Terrorism is a deliberate, systematic, and political act of violence, and the third edition of this seminal work analyzes the evolution of the phenomenon, including the rise of religiously motivated terrorism and the new adversaries, motivations, and tactics of global terrorism.",
+      "group": "terrorism",
+      "tier": 1,
+      "year": 2017,
+      "size": 3.132867132867133,
+      "in_degree": 5,
+      "out_degree": 1,
+      "betweenness": 1.0,
+      "centrality_score": 0.14160839160839161
+    },
+    {
+      "id": "mccants2015",
+      "label": "McCants (2015)",
+      "author": "McCants",
+      "title": "The ISIS Apocalypse: The History, Strategy, and Doomsday Vision of the Islamic State",
+      "thesis": "The Islamic State's history, strategy, and doomsday vision are deeply intertwined, with its apocalyptic religious fervor and strategic calculations shaping its past and foreshadowing its future actions. The group's distinct nature is rooted in its apocalyptic ideology, which drives its military and political goals.",
+      "group": "terrorism",
+      "tier": 1,
+      "year": 2015,
+      "size": 2.4615384615384617,
+      "in_degree": 3,
+      "out_degree": 0,
+      "betweenness": 0.0,
+      "centrality_score": 0.057692307692307696
+    },
+    {
+      "id": "stern_berger2015",
+      "label": "Stern, Berger (2015)",
+      "author": "Stern, Berger",
+      "title": "ISIS: The State of Terror",
+      "thesis": "ISIS is a formidable terrorist group that succeeded where Al-Qaeda failed by leveraging sophisticated social media and propaganda for global recruitment and establishing a proto-state, necessitating a fundamental shift in counter-terrorism strategy.",
+      "group": "terrorism",
+      "tier": 1,
+      "year": 2015,
+      "size": 2.6153846153846154,
+      "in_degree": 4,
+      "out_degree": 0,
+      "betweenness": 0.0,
+      "centrality_score": 0.07692307692307693
+    },
+    {
+      "id": "byman2015",
+      "label": "Byman (2015)",
+      "author": "Byman",
+      "title": "Al Qaeda, the Islamic State, and the Global Jihadist Movement",
+      "thesis": "This work provides a comprehensive overview of Al Qaeda's perseverance and adaptation since 9/11, alongside the rise of the Islamic State, to explain the limits of U.S. and allied counterterrorism efforts and offer insights into the future of the global jihadist movement.",
+      "group": "terrorism",
+      "tier": 2,
+      "year": 2015,
+      "size": 3.034965034965035,
+      "in_degree": 2,
+      "out_degree": 3,
+      "betweenness": 2.0,
+      "centrality_score": 0.12937062937062938
+    },
+    {
+      "id": "jones2014",
+      "label": "Jones (2014)",
+      "author": "Jones",
+      "title": "A Persistent Threat: The Evolution of al Qa'ida and Other Salafi Jihadists",
+      "thesis": "The Salafi-jihadist threat is persistent and growing, evidenced by an increase in the number of groups, fighters, and attacks since 2010, necessitating a new U.S. counterterrorism strategy combining engagement, forward partnering, and offshore balancing.",
+      "group": "terrorism",
+      "tier": 1,
+      "year": 2014,
+      "size": 2.6153846153846154,
+      "in_degree": 4,
+      "out_degree": 1,
+      "betweenness": 0.0,
+      "centrality_score": 0.07692307692307693
+    },
+    {
+      "id": "cronin2009",
+      "label": "Cronin (2009)",
+      "author": "Cronin",
+      "title": "How Terrorism Ends: Understanding the Decline and Demise of Terrorist Campaigns",
+      "thesis": "The book argues that all terrorist campaigns eventually end, and by examining six common pathways to their demise (decapitation, negotiation, success, failure, repression, and implosion) across two centuries of history, it provides a framework for understanding and accelerating the decline of contemporary groups like al-Qaeda.",
+      "group": "terrorism",
+      "tier": 1,
+      "year": 2009,
+      "size": 2.769230769230769,
+      "in_degree": 5,
+      "out_degree": 0,
+      "betweenness": 0.0,
+      "centrality_score": 0.09615384615384616
+    },
+    {
+      "id": "pape2005",
+      "label": "Pape (2005)",
+      "author": "Pape",
+      "title": "Dying to Win: The Strategic Logic of Suicide Terrorism",
+      "thesis": "Suicide terrorism is primarily a strategic response to foreign military occupation by democratic states, not a product of religious fanaticism or individual pathology. The goal is to compel the occupier to withdraw forces from the terrorists' perceived homeland.",
+      "group": "terrorism",
+      "tier": 1,
+      "year": 2005,
+      "size": 3.3846153846153846,
+      "in_degree": 9,
+      "out_degree": 0,
+      "betweenness": 0.0,
+      "centrality_score": 0.17307692307692307
+    },
+    {
+      "id": "felbabbrown2009",
+      "label": "Felbab-Brown (2009)",
+      "author": "Felbab-Brown",
+      "title": "Shooting Up: Counterinsurgency and the War on Drugs",
+      "thesis": "The conventional wisdom that attacking the drug trade will cause an insurgency to wither is dangerously wrongheaded; instead, counterinsurgency and the war on drugs often undermine each other, and a reliance on illicit economies can both sustain and distort the political objectives of belligerent groups. The book introduces the \"political capital model\" to explain the complex relationship between insurgents and illicit economies.",
+      "group": "convergence",
+      "tier": 1,
+      "year": 2009,
+      "size": 2.769230769230769,
+      "in_degree": 5,
+      "out_degree": 5,
+      "betweenness": 0.0,
+      "centrality_score": 0.09615384615384616
+    },
+    {
+      "id": "cornell2007",
+      "label": "Cornell (2007)",
+      "author": "Cornell",
+      "title": "Narcotics and Armed Conflict: Interaction and Implications",
+      "thesis": "The link between armed conflict and the production and trafficking of illicit drugs is best understood through a 'crime–rebellion nexus,' where armed conflict qualitatively and quantitatively transforms drug cultivation, and the narcotics industry strengthens insurgent groups while weakening the state, creating an economic function for war.",
+      "group": "convergence",
+      "tier": 1,
+      "year": 2007,
+      "size": 2.769230769230769,
+      "in_degree": 5,
+      "out_degree": 4,
+      "betweenness": 0.0,
+      "centrality_score": 0.09615384615384616
+    },
+    {
+      "id": "cockayne2011",
+      "label": "Cockayne (2011)",
+      "author": "Cockayne",
+      "title": "State Fragility, Organized Crime and Peacebuilding: Towards a More Strategic Approach",
+      "thesis": "The international community's current approach to organized crime in conflict-affected communities is hampered by normative, analytical, and practical obstacles. A more strategic response is needed that treats organized crime as a strategy of governance and differentiates its threats to peacebuilding.",
+      "group": "convergence",
+      "tier": 2,
+      "year": 2011,
+      "size": 2.0,
+      "in_degree": 0,
+      "out_degree": 7,
+      "betweenness": 0.0,
+      "centrality_score": 0.0
+    },
+    {
+      "id": "lessing2018",
+      "label": "Lessing (2018)",
+      "author": "Lessing",
+      "title": "Making Peace in Drug Wars: Crackdowns and Cartels in Latin America",
+      "thesis": "Brute-force repression generates incentives for cartels to fight back, while policies that condition repression on cartel violence can effectively deter cartel-state conflict. However, the politics of drug war make these conditional policies all too fragile and difficult to sustain.",
+      "group": "cartels",
+      "tier": 1,
+      "year": 2018,
+      "size": 3.5384615384615383,
+      "in_degree": 10,
+      "out_degree": 0,
+      "betweenness": 0.0,
+      "centrality_score": 0.19230769230769232
+    },
+    {
+      "id": "osorio2015",
+      "label": "Osorio (2015)",
+      "author": "Osorio",
+      "title": "The Contagion of Drug Violence: Spatiotemporal Dynamics of the Mexican War on Drugs",
+      "thesis": "The research provides evidence of the spatial diffusion of drug violence in Mexico from 2000 to 2010, finding that the disruptive effect of law enforcement is a significant catalyst for the intensification of violence between criminal organizations, especially in areas with a high concentration of criminal groups. Other factors like international, geographic, and socioeconomic characteristics have only a modest effect on the dynamics of drug-related violence.",
+      "group": "cartels",
+      "tier": 1,
+      "year": 2015,
+      "size": 4.3076923076923075,
+      "in_degree": 15,
+      "out_degree": 0,
+      "betweenness": 0.0,
+      "centrality_score": 0.28846153846153844
+    },
+    {
+      "id": "phillips2015",
+      "label": "Phillips (2015)",
+      "author": "Phillips",
+      "title": "How Does Leadership Decapitation Affect Violence? The Case of Drug Trafficking Organizations in Mexico",
+      "thesis": "Decapitation should weaken criminal organizations, temporarily reducing violence, but violence increases in the longer term as groups fragment and newer groups emerge. The short-term violence reduction is only associated with arrested (not killed) midlevel leaders, a finding that differs from studies on political groups.",
+      "group": "cartels",
+      "tier": 1,
+      "year": 2015,
+      "size": 4.5174825174825175,
+      "in_degree": 14,
+      "out_degree": 1,
+      "betweenness": 1.0,
+      "centrality_score": 0.3146853146853147
+    },
+    {
+      "id": "guerrerogutierrez2011",
+      "label": "Guerrero-Gutiérrez (2011)",
+      "author": "Guerrero-Gutiérrez",
+      "title": "Security, Drugs, and Violence in Mexico: A Survey",
+      "thesis": "The survey provides a comprehensive diagnosis of Mexico's security institutions and the dynamics of organized crime, arguing that the government's arrest-focused policy has inadvertently increased violence by fragmenting cartels and intensifying inter-group conflict. The fragmentation of drug trafficking organizations has led to a new typology of cartels and a rise in violence as groups fight for territorial control.",
+      "group": "cartels",
+      "tier": 1,
+      "year": 2011,
+      "size": 4.153846153846153,
+      "in_degree": 14,
+      "out_degree": 0,
+      "betweenness": 0.0,
+      "centrality_score": 0.2692307692307692
+    },
+    {
+      "id": "heinle2015",
+      "label": "Heinle, Molzahn, Shirk (2015)",
+      "author": "Heinle, Molzahn, Shirk",
+      "title": "Drug Violence in Mexico: Data and Analysis Through 2014",
+      "thesis": "The report provides a comprehensive data-driven analysis of drug violence in Mexico through 2014, finding that while homicides declined for the third consecutive year, the levels of organized-crime-style violence remain high and geographically shifting, with significant concerns regarding political corruption and disappearances.",
+      "group": "cartels",
+      "tier": 2,
+      "year": 2015,
+      "size": 2.1538461538461537,
+      "in_degree": 1,
+      "out_degree": 3,
+      "betweenness": 0.0,
+      "centrality_score": 0.019230769230769232
+    },
+    {
+      "id": "rios2013",
+      "label": "Ríos (2013)",
+      "author": "Ríos",
+      "title": "Why Did Mexico Become So Violent? A Self-Reinforcing Violent Equilibrium Caused by Competition and Enforcement",
+      "thesis": "Drug-related violence in Mexico escalated due to a \"self-reinforcing violent equilibrium\" caused by two interacting factors: competition among drug traffickers and casualties/arrests from law enforcement operations.",
+      "group": "cartels",
+      "tier": 1,
+      "year": 2013,
+      "size": 3.3846153846153846,
+      "in_degree": 9,
+      "out_degree": 0,
+      "betweenness": 0.0,
+      "centrality_score": 0.17307692307692307
+    },
+    {
+      "id": "astorga1999",
+      "label": "Astorga (1999)",
+      "author": "Astorga",
+      "title": "Drug Trafficking in Mexico: A First General Assessment",
+      "thesis": "This foundational assessment challenges the media's presentation of the Mexican drug scene as a copy of the Colombian model, arguing instead that drug trafficking in Mexico is deeply integrated with the political sphere and has a long, distinct history. The work emphasizes the need to study the phenomenon from a perspective that accounts for its political, social, and cultural dimensions, rather than just its criminal or economic aspects.",
+      "group": "cartels",
+      "tier": 1,
+      "year": 1999,
+      "size": 6.0,
+      "in_degree": 26,
+      "out_degree": 0,
+      "betweenness": 0.0,
+      "centrality_score": 0.5
+    },
+    {
+      "id": "shirk2011",
+      "label": "Shirk (2011)",
+      "author": "Shirk",
+      "title": "The Drug War in Mexico: Confronting a Shared Threat",
+      "thesis": "While fears of a failed Mexican state are exaggerated, the problems of crime, violence, and corruption pose grave challenges. The U.S. must expand its aid beyond security to strengthen Mexico's political institutions, economy, and civil society, and should reevaluate its own drug policy.",
+      "group": "cartels",
+      "tier": 1,
+      "year": 2011,
+      "size": 4.615384615384615,
+      "in_degree": 17,
+      "out_degree": 0,
+      "betweenness": 0.0,
+      "centrality_score": 0.3269230769230769
+    },
+    {
+      "id": "neumann2009",
+      "label": "Neumann (2009)",
+      "author": "Neumann",
+      "title": "Old and New Terrorism",
+      "thesis": "The book provides a comprehensive analysis of the evolution of terrorism, arguing that globalization and late modernity have driven a transformation from \"old\" terrorism (like the IRA) to a \"new\" form characterized by religiously inspired, mass-casualty attacks (like Al Qaeda).",
+      "group": "terrorism",
+      "tier": 1,
+      "year": 2009,
+      "size": 2.6153846153846154,
+      "in_degree": 4,
+      "out_degree": 0,
+      "betweenness": 0.0,
+      "centrality_score": 0.07692307692307693
+    },
+    {
+      "id": "wiktorowicz2005",
+      "label": "Wiktorowicz (2005)",
+      "author": "Wiktorowicz",
+      "title": "Radical Islam Rising: Muslim Extremism in the West",
+      "thesis": "This book explains the process of radicalization among Western Muslims by detailing the mechanisms that attract recruits, the instruments of persuasion that frame radical groups as \"real Islam,\" and the socialization process that leads to high-risk extremism, using the UK-based group al-Muhajiroun as a detailed case study.",
+      "group": "terrorism",
+      "tier": 1,
+      "year": 2005,
+      "size": 3.3846153846153846,
+      "in_degree": 9,
+      "out_degree": 0,
+      "betweenness": 0.0,
+      "centrality_score": 0.17307692307692307
+    }
+  ],
+  "links": [
+    {
+      "source": "logan2012",
+      "target": "grayson2010",
+      "value": 1
+    },
+    {
+      "source": "saab2009",
+      "target": "dishman2001",
+      "value": 1
+    },
+    {
+      "source": "sageman2008",
+      "target": "sageman2004",
+      "value": 1
+    },
+    {
+      "source": "winter2015",
+      "target": "berger2015",
+      "value": 1
+    },
+    {
+      "source": "gartensteinross2009",
+      "target": "sageman2008",
+      "value": 1
+    },
+    {
+      "source": "gartensteinross2009",
+      "target": "wiktorowicz2005",
+      "value": 1
+    },
+    {
+      "source": "shelley2014",
+      "target": "shelley2005",
+      "value": 1
+    },
+    {
+      "source": "thomas2005",
+      "target": "williams2001",
+      "value": 1
+    },
+    {
+      "source": "hesterman2013",
+      "target": "williams2001",
+      "value": 1
+    },
+    {
+      "source": "campbell2014",
+      "target": "bunker2010",
+      "value": 1
+    },
+    {
+      "source": "grillo2016",
+      "target": "grillo2011",
+      "value": 1
+    },
+    {
+      "source": "unodc2024",
+      "target": "shelley2014",
+      "value": 1
+    },
+    {
+      "source": "crisisgroup2024",
+      "target": "prietocuriel2023",
+      "value": 1
+    },
+    {
+      "source": "carnegieendowment2023",
+      "target": "shelley2005",
+      "value": 1
+    },
+    {
+      "source": "insightcrime2024",
+      "target": "chomczynski2023",
+      "value": 1
+    },
+    {
+      "source": "wilbur2025",
+      "target": "bunker2013",
+      "value": 1
+    },
+    {
+      "source": "washingtonpost2023",
+      "target": "prietocuriel2023",
+      "value": 1
+    },
+    {
+      "source": "washingtonpost2023",
+      "target": "chomczynski2023",
+      "value": 1
+    },
+    {
+      "source": "bbc2023",
+      "target": "chomczynski2023",
+      "value": 1
+    },
+    {
+      "source": "propublica2020",
+      "target": "chomczynski2023",
+      "value": 1
+    },
+    {
+      "source": "proceso2024",
+      "target": "chomczynski2023",
+      "value": 1
+    },
+    {
+      "source": "reforma2023",
+      "target": "prietocuriel2023",
+      "value": 1
+    },
+    {
+      "source": "reforma2023",
+      "target": "chomczynski2023",
+      "value": 1
+    },
+    {
+      "source": "theverge2023",
+      "target": "chomczynski2023",
+      "value": 1
+    },
+    {
+      "source": "bunker2010",
+      "target": "bunker2010",
+      "value": 1
+    },
+    {
+      "source": "bunker2010",
+      "target": "shelley2014",
+      "value": 1
+    },
+    {
+      "source": "byman2015",
+      "target": "sageman2004",
+      "value": 1
+    },
+    {
+      "source": "jones2014",
+      "target": "sageman2008",
+      "value": 1
+    },
+    {
+      "source": "felbabbrown2009",
+      "target": "makarenko2008",
+      "value": 1
+    },
+    {
+      "source": "phillips2015",
+      "target": "kenney2007",
+      "value": 1
+    },
+    {
+      "source": "prietocuriel2023",
+      "target": "shirk2011",
+      "value": 1
+    },
+    {
+      "source": "prietocuriel2023",
+      "target": "phillips2015",
+      "value": 1
+    },
+    {
+      "source": "prietocuriel2023",
+      "target": "osorio2015",
+      "value": 1
+    },
+    {
+      "source": "prietocuriel2023",
+      "target": "bunker_sullivan2010",
+      "value": 1
+    },
+    {
+      "source": "prietocuriel2023",
+      "target": "logan2012",
+      "value": 1
+    },
+    {
+      "source": "chomczynski2023",
+      "target": "grayson2010",
+      "value": 1
+    },
+    {
+      "source": "chomczynski2023",
+      "target": "correa-cabrera2017",
+      "value": 1
+    },
+    {
+      "source": "chomczynski2023",
+      "target": "lessing2018",
+      "value": 1
+    },
+    {
+      "source": "chomczynski2023",
+      "target": "grillo2016",
+      "value": 1
+    },
+    {
+      "source": "garcia2006",
+      "target": "astorga1999",
+      "value": 1
+    },
+    {
+      "source": "garcia2006",
+      "target": "williams2001",
+      "value": 1
+    },
+    {
+      "source": "offstein2003",
+      "target": "dishman2001",
+      "value": 1
+    },
+    {
+      "source": "offstein2003",
+      "target": "astorga1999",
+      "value": 1
+    },
+    {
+      "source": "offstein2003",
+      "target": "williams2001",
+      "value": 1
+    },
+    {
+      "source": "logan2012",
+      "target": "shirk2011",
+      "value": 1
+    },
+    {
+      "source": "logan2012",
+      "target": "astorga1999",
+      "value": 1
+    },
+    {
+      "source": "jaffe2015",
+      "target": "guerrerogutierrez2011",
+      "value": 1
+    },
+    {
+      "source": "jaffe2015",
+      "target": "astorga1999",
+      "value": 1
+    },
+    {
+      "source": "jaffe2015",
+      "target": "grayson2010",
+      "value": 1
+    },
+    {
+      "source": "saab2009",
+      "target": "astorga1999",
+      "value": 1
+    },
+    {
+      "source": "saab2009",
+      "target": "williams2001",
+      "value": 1
+    },
+    {
+      "source": "saab2009",
+      "target": "sageman2004",
+      "value": 1
+    },
+    {
+      "source": "saab2009",
+      "target": "sageman2008",
+      "value": 1
+    },
+    {
+      "source": "bjorkhaug2010",
+      "target": "gartensteinross2009",
+      "value": 1
+    },
+    {
+      "source": "bjorkhaug2010",
+      "target": "ctc2007",
+      "value": 1
+    },
+    {
+      "source": "bjorkhaug2010",
+      "target": "thomas2005",
+      "value": 1
+    },
+    {
+      "source": "downing2022",
+      "target": "winter2015",
+      "value": 1
+    },
+    {
+      "source": "downing2022",
+      "target": "sageman2004",
+      "value": 1
+    },
+    {
+      "source": "downing2022",
+      "target": "neumann2009",
+      "value": 1
+    },
+    {
+      "source": "downing2022",
+      "target": "jones2014",
+      "value": 1
+    },
+    {
+      "source": "downing2022",
+      "target": "sageman2008",
+      "value": 1
+    },
+    {
+      "source": "sanin2012",
+      "target": "pape2005",
+      "value": 1
+    },
+    {
+      "source": "sanin2012",
+      "target": "hofmann2011",
+      "value": 1
+    },
+    {
+      "source": "sanin2012",
+      "target": "thomas2005",
+      "value": 1
+    },
+    {
+      "source": "calderoni2022",
+      "target": "lessing2018",
+      "value": 1
+    },
+    {
+      "source": "calderoni2022",
+      "target": "astorga1999",
+      "value": 1
+    },
+    {
+      "source": "calderoni2022",
+      "target": "shirk2011",
+      "value": 1
+    },
+    {
+      "source": "calderoni2022",
+      "target": "logan2012",
+      "value": 1
+    },
+    {
+      "source": "calderoni2022",
+      "target": "grillo2016",
+      "value": 1
+    },
+    {
+      "source": "prezelj2024",
+      "target": "winter2015",
+      "value": 1
+    },
+    {
+      "source": "prezelj2024",
+      "target": "gartensteinross2009",
+      "value": 1
+    },
+    {
+      "source": "prezelj2024",
+      "target": "bloom2017",
+      "value": 1
+    },
+    {
+      "source": "prezelj2024",
+      "target": "stern_berger2015",
+      "value": 1
+    },
+    {
+      "source": "prezelj2024",
+      "target": "pape2005",
+      "value": 1
+    },
+    {
+      "source": "taarnby2005",
+      "target": "fair2004",
+      "value": 1
+    },
+    {
+      "source": "taarnby2005",
+      "target": "sageman2004",
+      "value": 1
+    },
+    {
+      "source": "yayla2017",
+      "target": "arjona2012",
+      "value": 1
+    },
+    {
+      "source": "yayla2017",
+      "target": "sageman2008",
+      "value": 1
+    },
+    {
+      "source": "yayla2017",
+      "target": "ctc2007",
+      "value": 1
+    },
+    {
+      "source": "termeer2022",
+      "target": "wiktorowicz2005",
+      "value": 1
+    },
+    {
+      "source": "termeer2022",
+      "target": "hoffman2017",
+      "value": 1
+    },
+    {
+      "source": "termeer2022",
+      "target": "bloom2017",
+      "value": 1
+    },
+    {
+      "source": "termeer2022",
+      "target": "gartensteinross2009",
+      "value": 1
+    },
+    {
+      "source": "termeer2022",
+      "target": "sageman2004",
+      "value": 1
+    },
+    {
+      "source": "farber2023",
+      "target": "sageman2004",
+      "value": 1
+    },
+    {
+      "source": "farber2023",
+      "target": "sageman2008",
+      "value": 1
+    },
+    {
+      "source": "farber2023",
+      "target": "gerwehr_daly2006",
+      "value": 1
+    },
+    {
+      "source": "farber2023",
+      "target": "mccants2015",
+      "value": 1
+    },
+    {
+      "source": "shelley2014",
+      "target": "grayson2010",
+      "value": 1
+    },
+    {
+      "source": "shelley2014",
+      "target": "guerrerogutierrez2011",
+      "value": 1
+    },
+    {
+      "source": "shelley2014",
+      "target": "pape2005",
+      "value": 1
+    },
+    {
+      "source": "shelley2014",
+      "target": "thomas2005",
+      "value": 1
+    },
+    {
+      "source": "shelley2005",
+      "target": "astorga1999",
+      "value": 1
+    },
+    {
+      "source": "shelley2005",
+      "target": "williams2001",
+      "value": 1
+    },
+    {
+      "source": "shelley2005",
+      "target": "sageman2004",
+      "value": 1
+    },
+    {
+      "source": "shelley2005",
+      "target": "fair2004",
+      "value": 1
+    },
+    {
+      "source": "makarenko2008",
+      "target": "dishman2001",
+      "value": 1
+    },
+    {
+      "source": "makarenko2008",
+      "target": "kenney2007",
+      "value": 1
+    },
+    {
+      "source": "makarenko2008",
+      "target": "shelley2005",
+      "value": 1
+    },
+    {
+      "source": "makarenko2008",
+      "target": "williams2001",
+      "value": 1
+    },
+    {
+      "source": "makarenko2008",
+      "target": "astorga1999",
+      "value": 1
+    },
+    {
+      "source": "makarenko2008",
+      "target": "pape2005",
+      "value": 1
+    },
+    {
+      "source": "makarenko2008",
+      "target": "thomas2005",
+      "value": 1
+    },
+    {
+      "source": "dishman2001",
+      "target": "astorga1999",
+      "value": 1
+    },
+    {
+      "source": "miklaucic2013",
+      "target": "shirk2011",
+      "value": 1
+    },
+    {
+      "source": "miklaucic2013",
+      "target": "williams2001",
+      "value": 1
+    },
+    {
+      "source": "miklaucic2013",
+      "target": "pape2005",
+      "value": 1
+    },
+    {
+      "source": "miklaucic2013",
+      "target": "sageman2008",
+      "value": 1
+    },
+    {
+      "source": "hesterman2013",
+      "target": "saab2009",
+      "value": 1
+    },
+    {
+      "source": "hesterman2013",
+      "target": "cornell2007",
+      "value": 1
+    },
+    {
+      "source": "hesterman2013",
+      "target": "felbabbrown2009",
+      "value": 1
+    },
+    {
+      "source": "hesterman2013",
+      "target": "guerrerogutierrez2011",
+      "value": 1
+    },
+    {
+      "source": "hesterman2013",
+      "target": "hofmann2011",
+      "value": 1
+    },
+    {
+      "source": "hesterman2013",
+      "target": "gerwehr_daly2006",
+      "value": 1
+    },
+    {
+      "source": "mullins2016",
+      "target": "dishman2001",
+      "value": 1
+    },
+    {
+      "source": "mullins2016",
+      "target": "shelley2014",
+      "value": 1
+    },
+    {
+      "source": "mullins2016",
+      "target": "miklaucic2013",
+      "value": 1
+    },
+    {
+      "source": "mullins2016",
+      "target": "grillo2011",
+      "value": 1
+    },
+    {
+      "source": "mullins2016",
+      "target": "astorga1999",
+      "value": 1
+    },
+    {
+      "source": "mullins2016",
+      "target": "fair2004",
+      "value": 1
+    },
+    {
+      "source": "mullins2016",
+      "target": "cronin2009",
+      "value": 1
+    },
+    {
+      "source": "alvi2020",
+      "target": "kenney2007",
+      "value": 1
+    },
+    {
+      "source": "alvi2020",
+      "target": "shelley2005",
+      "value": 1
+    },
+    {
+      "source": "alvi2020",
+      "target": "dishman2001",
+      "value": 1
+    },
+    {
+      "source": "alvi2020",
+      "target": "grillo2016",
+      "value": 1
+    },
+    {
+      "source": "alvi2020",
+      "target": "grayson2010",
+      "value": 1
+    },
+    {
+      "source": "alvi2020",
+      "target": "gerwehr_daly2006",
+      "value": 1
+    },
+    {
+      "source": "alvi2020",
+      "target": "ctc2007",
+      "value": 1
+    },
+    {
+      "source": "alvi2020",
+      "target": "shelley2014",
+      "value": 1
+    },
+    {
+      "source": "bunker_sullivan2010",
+      "target": "astorga1999",
+      "value": 1
+    },
+    {
+      "source": "bunker_sullivan2010",
+      "target": "williams2001",
+      "value": 1
+    },
+    {
+      "source": "bunker2013",
+      "target": "guerrerogutierrez2011",
+      "value": 1
+    },
+    {
+      "source": "bunker2013",
+      "target": "shirk2011",
+      "value": 1
+    },
+    {
+      "source": "bunker2013",
+      "target": "williams2001",
+      "value": 1
+    },
+    {
+      "source": "nationalcounterterrorismcenter2023",
+      "target": "bloom2017",
+      "value": 1
+    },
+    {
+      "source": "nationalcounterterrorismcenter2023",
+      "target": "stern_berger2015",
+      "value": 1
+    },
+    {
+      "source": "nationalcounterterrorismcenter2023",
+      "target": "hoffman2017",
+      "value": 1
+    },
+    {
+      "source": "nationalcounterterrorismcenter2023",
+      "target": "neumann2009",
+      "value": 1
+    },
+    {
+      "source": "richardson2024",
+      "target": "osorio2015",
+      "value": 1
+    },
+    {
+      "source": "richardson2024",
+      "target": "grayson2010",
+      "value": 1
+    },
+    {
+      "source": "richardson2024",
+      "target": "williams2001",
+      "value": 1
+    },
+    {
+      "source": "richardson2024",
+      "target": "rios2013",
+      "value": 1
+    },
+    {
+      "source": "richardson2024",
+      "target": "shirk2011",
+      "value": 1
+    },
+    {
+      "source": "beittel2023",
+      "target": "correa-cabrera2017",
+      "value": 1
+    },
+    {
+      "source": "beittel2023",
+      "target": "phillips2015",
+      "value": 1
+    },
+    {
+      "source": "beittel2023",
+      "target": "astorga1999",
+      "value": 1
+    },
+    {
+      "source": "beittel2023",
+      "target": "bunker2013",
+      "value": 1
+    },
+    {
+      "source": "beittel2023",
+      "target": "grillo2016",
+      "value": 1
+    },
+    {
+      "source": "unodc2024",
+      "target": "saab2009",
+      "value": 1
+    },
+    {
+      "source": "unodc2024",
+      "target": "felbabbrown2009",
+      "value": 1
+    },
+    {
+      "source": "unodc2024",
+      "target": "grillo2011",
+      "value": 1
+    },
+    {
+      "source": "unodc2024",
+      "target": "shirk2011",
+      "value": 1
+    },
+    {
+      "source": "unodc2024",
+      "target": "berger2015",
+      "value": 1
+    },
+    {
+      "source": "unodc2024",
+      "target": "wiktorowicz2005",
+      "value": 1
+    },
+    {
+      "source": "unodc2024",
+      "target": "mullins2016",
+      "value": 1
+    },
+    {
+      "source": "unodc2024",
+      "target": "miklaucic2013",
+      "value": 1
+    },
+    {
+      "source": "interpol2023",
+      "target": "shelley2005",
+      "value": 1
+    },
+    {
+      "source": "interpol2023",
+      "target": "cornell2007",
+      "value": 1
+    },
+    {
+      "source": "interpol2023",
+      "target": "nationaldefenseuniversity2013",
+      "value": 1
+    },
+    {
+      "source": "interpol2023",
+      "target": "phillips2015",
+      "value": 1
+    },
+    {
+      "source": "interpol2023",
+      "target": "grillo2016",
+      "value": 1
+    },
+    {
+      "source": "interpol2023",
+      "target": "jones2014",
+      "value": 1
+    },
+    {
+      "source": "interpol2023",
+      "target": "berger2015",
+      "value": 1
+    },
+    {
+      "source": "interpol2023",
+      "target": "dishman2001",
+      "value": 1
+    },
+    {
+      "source": "europol2024",
+      "target": "sageman2008",
+      "value": 1
+    },
+    {
+      "source": "europol2024",
+      "target": "mccants2015",
+      "value": 1
+    },
+    {
+      "source": "oas2022",
+      "target": "osorio2015",
+      "value": 1
+    },
+    {
+      "source": "oas2022",
+      "target": "astorga1999",
+      "value": 1
+    },
+    {
+      "source": "oas2022",
+      "target": "phillips2015",
+      "value": 1
+    },
+    {
+      "source": "oas2022",
+      "target": "correa-cabrera2017",
+      "value": 1
+    },
+    {
+      "source": "oas2022",
+      "target": "grayson2010",
+      "value": 1
+    },
+    {
+      "source": "nationaldefenseuniversity2013",
+      "target": "guerrerogutierrez2011",
+      "value": 1
+    },
+    {
+      "source": "nationaldefenseuniversity2013",
+      "target": "grayson2010",
+      "value": 1
+    },
+    {
+      "source": "nationaldefenseuniversity2013",
+      "target": "sageman2008",
+      "value": 1
+    },
+    {
+      "source": "nationaldefenseuniversity2013",
+      "target": "sageman2004",
+      "value": 1
+    },
+    {
+      "source": "nps2022",
+      "target": "saab2009",
+      "value": 1
+    },
+    {
+      "source": "nps2022",
+      "target": "nationaldefenseuniversity2013",
+      "value": 1
+    },
+    {
+      "source": "nps2022",
+      "target": "shelley2005",
+      "value": 1
+    },
+    {
+      "source": "nps2022",
+      "target": "phillips2015",
+      "value": 1
+    },
+    {
+      "source": "nps2022",
+      "target": "astorga1999",
+      "value": 1
+    },
+    {
+      "source": "nps2022",
+      "target": "sageman2008",
+      "value": 1
+    },
+    {
+      "source": "nps2022",
+      "target": "neumann2009",
+      "value": 1
+    },
+    {
+      "source": "airuniversity2020",
+      "target": "cronin2009",
+      "value": 1
+    },
+    {
+      "source": "airuniversity2020",
+      "target": "awan2017",
+      "value": 1
+    },
+    {
+      "source": "airuniversity2020",
+      "target": "thomas2005",
+      "value": 1
+    },
+    {
+      "source": "airuniversity2020",
+      "target": "sageman2004",
+      "value": 1
+    },
+    {
+      "source": "airuniversity2020",
+      "target": "stern_berger2015",
+      "value": 1
+    },
+    {
+      "source": "bledsoe2025",
+      "target": "correa-cabrera2017",
+      "value": 1
+    },
+    {
+      "source": "bledsoe2025",
+      "target": "williams2001",
+      "value": 1
+    },
+    {
+      "source": "bledsoe2025",
+      "target": "grillo2011",
+      "value": 1
+    },
+    {
+      "source": "bledsoe2025",
+      "target": "prietocuriel2023",
+      "value": 1
+    },
+    {
+      "source": "crisisgroup2024",
+      "target": "grillo2016",
+      "value": 1
+    },
+    {
+      "source": "crisisgroup2024",
+      "target": "grayson2010",
+      "value": 1
+    },
+    {
+      "source": "crisisgroup2024",
+      "target": "correa-cabrera2017",
+      "value": 1
+    },
+    {
+      "source": "chomczynski2023",
+      "target": "osorio2015",
+      "value": 1
+    },
+    {
+      "source": "chomczynski2023",
+      "target": "grillo2011",
+      "value": 1
+    },
+    {
+      "source": "chomczynski2023",
+      "target": "bunker_sullivan2010",
+      "value": 1
+    },
+    {
+      "source": "brookingsinstitution2024",
+      "target": "sageman2008",
+      "value": 1
+    },
+    {
+      "source": "brookingsinstitution2024",
+      "target": "gartensteinross2009",
+      "value": 1
+    },
+    {
+      "source": "brookingsinstitution2024",
+      "target": "winter2015",
+      "value": 1
+    },
+    {
+      "source": "brookingsinstitution2024",
+      "target": "mccants2015",
+      "value": 1
+    },
+    {
+      "source": "carnegieendowment2023",
+      "target": "nationaldefenseuniversity2013",
+      "value": 1
+    },
+    {
+      "source": "carnegieendowment2023",
+      "target": "felbabbrown2009",
+      "value": 1
+    },
+    {
+      "source": "carnegieendowment2023",
+      "target": "dishman2001",
+      "value": 1
+    },
+    {
+      "source": "carnegieendowment2023",
+      "target": "grillo2011",
+      "value": 1
+    },
+    {
+      "source": "carnegieendowment2023",
+      "target": "osorio2015",
+      "value": 1
+    },
+    {
+      "source": "carnegieendowment2023",
+      "target": "jones2014",
+      "value": 1
+    },
+    {
+      "source": "carnegieendowment2023",
+      "target": "thomas2005",
+      "value": 1
+    },
+    {
+      "source": "cfr2024",
+      "target": "grillo2016",
+      "value": 1
+    },
+    {
+      "source": "cfr2024",
+      "target": "grayson2010",
+      "value": 1
+    },
+    {
+      "source": "cfr2024",
+      "target": "phillips2015",
+      "value": 1
+    },
+    {
+      "source": "cfr2024",
+      "target": "astorga1999",
+      "value": 1
+    },
+    {
+      "source": "cfr2024",
+      "target": "bunker2013",
+      "value": 1
+    },
+    {
+      "source": "atlanticcouncil2023",
+      "target": "wiktorowicz2005",
+      "value": 1
+    },
+    {
+      "source": "atlanticcouncil2023",
+      "target": "cronin2009",
+      "value": 1
+    },
+    {
+      "source": "atlanticcouncil2023",
+      "target": "sageman2008",
+      "value": 1
+    },
+    {
+      "source": "atlanticcouncil2023",
+      "target": "fair2004",
+      "value": 1
+    },
+    {
+      "source": "atlanticcouncil2023",
+      "target": "pape2005",
+      "value": 1
+    },
+    {
+      "source": "stimson2024",
+      "target": "nationaldefenseuniversity2013",
+      "value": 1
+    },
+    {
+      "source": "stimson2024",
+      "target": "shelley2005",
+      "value": 1
+    },
+    {
+      "source": "stimson2024",
+      "target": "shelley2014",
+      "value": 1
+    },
+    {
+      "source": "stimson2024",
+      "target": "astorga1999",
+      "value": 1
+    },
+    {
+      "source": "stimson2024",
+      "target": "grillo2016",
+      "value": 1
+    },
+    {
+      "source": "stimson2024",
+      "target": "bloom2017",
+      "value": 1
+    },
+    {
+      "source": "stimson2024",
+      "target": "wiktorowicz2005",
+      "value": 1
+    },
+    {
+      "source": "stimson2024",
+      "target": "makarenko2008",
+      "value": 1
+    },
+    {
+      "source": "chomczynski2023",
+      "target": "shirk2011",
+      "value": 1
+    },
+    {
+      "source": "chomczynski2023",
+      "target": "campbell2014",
+      "value": 1
+    },
+    {
+      "source": "chomczynski2023",
+      "target": "astorga1999",
+      "value": 1
+    },
+    {
+      "source": "meza2019",
+      "target": "shirk2011",
+      "value": 1
+    },
+    {
+      "source": "meza2019",
+      "target": "grayson2010",
+      "value": 1
+    },
+    {
+      "source": "meza2019",
+      "target": "osorio2015",
+      "value": 1
+    },
+    {
+      "source": "insightcrime2024",
+      "target": "rios2013",
+      "value": 1
+    },
+    {
+      "source": "insightcrime2024",
+      "target": "astorga1999",
+      "value": 1
+    },
+    {
+      "source": "insightcrime2024",
+      "target": "grillo2011",
+      "value": 1
+    },
+    {
+      "source": "insightcrime2024",
+      "target": "grillo2016",
+      "value": 1
+    },
+    {
+      "source": "iiss2023",
+      "target": "shirk2011",
+      "value": 1
+    },
+    {
+      "source": "iiss2023",
+      "target": "grillo2016",
+      "value": 1
+    },
+    {
+      "source": "iiss2023",
+      "target": "astorga1999",
+      "value": 1
+    },
+    {
+      "source": "iiss2023",
+      "target": "grillo2011",
+      "value": 1
+    },
+    {
+      "source": "wilbur2025",
+      "target": "lessing2018",
+      "value": 1
+    },
+    {
+      "source": "wilbur2025",
+      "target": "grayson2010",
+      "value": 1
+    },
+    {
+      "source": "wilbur2025",
+      "target": "shirk2011",
+      "value": 1
+    },
+    {
+      "source": "wilbur2025",
+      "target": "phillips2015",
+      "value": 1
+    },
+    {
+      "source": "wilbur2025",
+      "target": "williams2001",
+      "value": 1
+    },
+    {
+      "source": "muggah2020",
+      "target": "phillips2015",
+      "value": 1
+    },
+    {
+      "source": "muggah2020",
+      "target": "lessing2018",
+      "value": 1
+    },
+    {
+      "source": "muggah2020",
+      "target": "williams2001",
+      "value": 1
+    },
+    {
+      "source": "muggah2020",
+      "target": "osorio2015",
+      "value": 1
+    },
+    {
+      "source": "muggah2020",
+      "target": "shirk2011",
+      "value": 1
+    },
+    {
+      "source": "prietocuriel2023",
+      "target": "williams2001",
+      "value": 1
+    },
+    {
+      "source": "prietocuriel2023",
+      "target": "grillo2016",
+      "value": 1
+    },
+    {
+      "source": "prietocuriel2023",
+      "target": "lessing2018",
+      "value": 1
+    },
+    {
+      "source": "prietocuriel2023",
+      "target": "guerrerogutierrez2011",
+      "value": 1
+    },
+    {
+      "source": "prietocuriel2023",
+      "target": "correa-cabrera2017",
+      "value": 1
+    },
+    {
+      "source": "schmitz2025",
+      "target": "grillo2011",
+      "value": 1
+    },
+    {
+      "source": "schmitz2025",
+      "target": "guerrerogutierrez2011",
+      "value": 1
+    },
+    {
+      "source": "schmitz2025",
+      "target": "phillips2015",
+      "value": 1
+    },
+    {
+      "source": "schmitz2025",
+      "target": "osorio2015",
+      "value": 1
+    },
+    {
+      "source": "solis2024",
+      "target": "propublica2020",
+      "value": 1
+    },
+    {
+      "source": "pannell2025",
+      "target": "propublica2020",
+      "value": 1
+    },
+    {
+      "source": "diaz2023",
+      "target": "saab2009",
+      "value": 1
+    },
+    {
+      "source": "diaz2023",
+      "target": "cornell2007",
+      "value": 1
+    },
+    {
+      "source": "diaz2023",
+      "target": "nationaldefenseuniversity2013",
+      "value": 1
+    },
+    {
+      "source": "diaz2023",
+      "target": "grayson2010",
+      "value": 1
+    },
+    {
+      "source": "diaz2023",
+      "target": "lessing2018",
+      "value": 1
+    },
+    {
+      "source": "diaz2023",
+      "target": "awan2017",
+      "value": 1
+    },
+    {
+      "source": "diaz2023",
+      "target": "fair2004",
+      "value": 1
+    },
+    {
+      "source": "diaz2023",
+      "target": "mullins2016",
+      "value": 1
+    },
+    {
+      "source": "kitroeff2024",
+      "target": "phillips2015",
+      "value": 1
+    },
+    {
+      "source": "kitroeff2024",
+      "target": "lessing2018",
+      "value": 1
+    },
+    {
+      "source": "kitroeff2024",
+      "target": "guerrerogutierrez2011",
+      "value": 1
+    },
+    {
+      "source": "kitroeff2024",
+      "target": "williams2001",
+      "value": 1
+    },
+    {
+      "source": "washingtonpost2023",
+      "target": "grayson2010",
+      "value": 1
+    },
+    {
+      "source": "washingtonpost2023",
+      "target": "campbell2014",
+      "value": 1
+    },
+    {
+      "source": "washingtonpost2023",
+      "target": "williams2001",
+      "value": 1
+    },
+    {
+      "source": "washingtonpost2023",
+      "target": "bunker2013",
+      "value": 1
+    },
+    {
+      "source": "washingtonpost2023",
+      "target": "logan2012",
+      "value": 1
+    },
+    {
+      "source": "guardian2024",
+      "target": "hoffman2017",
+      "value": 1
+    },
+    {
+      "source": "guardian2024",
+      "target": "arjona2012",
+      "value": 1
+    },
+    {
+      "source": "guardian2024",
+      "target": "pape2005",
+      "value": 1
+    },
+    {
+      "source": "guardian2024",
+      "target": "sageman2004",
+      "value": 1
+    },
+    {
+      "source": "bbc2023",
+      "target": "correa-cabrera2017",
+      "value": 1
+    },
+    {
+      "source": "bbc2023",
+      "target": "shirk2011",
+      "value": 1
+    },
+    {
+      "source": "bbc2023",
+      "target": "grillo2016",
+      "value": 1
+    },
+    {
+      "source": "bbc2023",
+      "target": "osorio2015",
+      "value": 1
+    },
+    {
+      "source": "bbc2023",
+      "target": "grayson2010",
+      "value": 1
+    },
+    {
+      "source": "vice_news2024",
+      "target": "propublica2020",
+      "value": 1
+    },
+    {
+      "source": "reuters2024",
+      "target": "guerrerogutierrez2011",
+      "value": 1
+    },
+    {
+      "source": "reuters2024",
+      "target": "campbell2014",
+      "value": 1
+    },
+    {
+      "source": "reuters2024",
+      "target": "rios2013",
+      "value": 1
+    },
+    {
+      "source": "reuters2024",
+      "target": "grillo2016",
+      "value": 1
+    },
+    {
+      "source": "reuters2024",
+      "target": "correa-cabrera2017",
+      "value": 1
+    },
+    {
+      "source": "associatedpress2023",
+      "target": "propublica2020",
+      "value": 1
+    },
+    {
+      "source": "proceso2024",
+      "target": "phillips2015",
+      "value": 1
+    },
+    {
+      "source": "proceso2024",
+      "target": "osorio2015",
+      "value": 1
+    },
+    {
+      "source": "proceso2024",
+      "target": "astorga1999",
+      "value": 1
+    },
+    {
+      "source": "proceso2024",
+      "target": "rios2013",
+      "value": 1
+    },
+    {
+      "source": "reforma2023",
+      "target": "propublica2020",
+      "value": 1
+    },
+    {
+      "source": "martinez2025",
+      "target": "rios2013",
+      "value": 1
+    },
+    {
+      "source": "martinez2025",
+      "target": "guerrerogutierrez2011",
+      "value": 1
+    },
+    {
+      "source": "martinez2025",
+      "target": "lessing2018",
+      "value": 1
+    },
+    {
+      "source": "martinez2025",
+      "target": "bunker_sullivan2010",
+      "value": 1
+    },
+    {
+      "source": "martinez2025",
+      "target": "grillo2016",
+      "value": 1
+    },
+    {
+      "source": "eltiempo2023",
+      "target": "propublica2020",
+      "value": 1
+    },
+    {
+      "source": "semana2024",
+      "target": "rios2013",
+      "value": 1
+    },
+    {
+      "source": "semana2024",
+      "target": "campbell2014",
+      "value": 1
+    },
+    {
+      "source": "semana2024",
+      "target": "shirk2011",
+      "value": 1
+    },
+    {
+      "source": "semana2024",
+      "target": "prietocuriel2023",
+      "value": 1
+    },
+    {
+      "source": "activefence2025",
+      "target": "correa-cabrera2017",
+      "value": 1
+    },
+    {
+      "source": "activefence2025",
+      "target": "grayson2010",
+      "value": 1
+    },
+    {
+      "source": "activefence2025",
+      "target": "grillo2011",
+      "value": 1
+    },
+    {
+      "source": "activefence2025",
+      "target": "guerrerogutierrez2011",
+      "value": 1
+    },
+    {
+      "source": "cognyte2025",
+      "target": "cornell2007",
+      "value": 1
+    },
+    {
+      "source": "cognyte2025",
+      "target": "dishman2001",
+      "value": 1
+    },
+    {
+      "source": "cognyte2025",
+      "target": "felbabbrown2009",
+      "value": 1
+    },
+    {
+      "source": "cognyte2025",
+      "target": "phillips2015",
+      "value": 1
+    },
+    {
+      "source": "cognyte2025",
+      "target": "lessing2018",
+      "value": 1
+    },
+    {
+      "source": "cognyte2025",
+      "target": "hofmann2011",
+      "value": 1
+    },
+    {
+      "source": "cognyte2025",
+      "target": "berger2015",
+      "value": 1
+    },
+    {
+      "source": "cognyte2025",
+      "target": "mullins2016",
+      "value": 1
+    },
+    {
+      "source": "techagainstterrorism2024",
+      "target": "winter2015",
+      "value": 1
+    },
+    {
+      "source": "techagainstterrorism2024",
+      "target": "wiktorowicz2005",
+      "value": 1
+    },
+    {
+      "source": "techagainstterrorism2024",
+      "target": "hofmann2011",
+      "value": 1
+    },
+    {
+      "source": "techagainstterrorism2024",
+      "target": "bloom2017",
+      "value": 1
+    },
+    {
+      "source": "techagainstterrorism2024",
+      "target": "hoffman2017",
+      "value": 1
+    },
+    {
+      "source": "meta2024",
+      "target": "phillips2015",
+      "value": 1
+    },
+    {
+      "source": "meta2024",
+      "target": "rios2013",
+      "value": 1
+    },
+    {
+      "source": "meta2024",
+      "target": "shirk2011",
+      "value": 1
+    },
+    {
+      "source": "meta2024",
+      "target": "osorio2015",
+      "value": 1
+    },
+    {
+      "source": "tiktok_safety2023",
+      "target": "shirk2011",
+      "value": 1
+    },
+    {
+      "source": "tiktok_safety2023",
+      "target": "grayson2010",
+      "value": 1
+    },
+    {
+      "source": "tiktok_safety2023",
+      "target": "grillo2016",
+      "value": 1
+    },
+    {
+      "source": "tiktok_safety2023",
+      "target": "osorio2015",
+      "value": 1
+    },
+    {
+      "source": "tiktok_safety2023",
+      "target": "guerrerogutierrez2011",
+      "value": 1
+    },
+    {
+      "source": "telegram2024",
+      "target": "neumann2009",
+      "value": 1
+    },
+    {
+      "source": "telegram2024",
+      "target": "arjona2012",
+      "value": 1
+    },
+    {
+      "source": "telegram2024",
+      "target": "bloom2017",
+      "value": 1
+    },
+    {
+      "source": "telegram2024",
+      "target": "winter2015",
+      "value": 1
+    },
+    {
+      "source": "telegram2024",
+      "target": "gerwehr_daly2006",
+      "value": 1
+    },
+    {
+      "source": "techstream2024",
+      "target": "osorio2015",
+      "value": 1
+    },
+    {
+      "source": "techstream2024",
+      "target": "shirk2011",
+      "value": 1
+    },
+    {
+      "source": "techstream2024",
+      "target": "correa-cabrera2017",
+      "value": 1
+    },
+    {
+      "source": "techstream2024",
+      "target": "grillo2016",
+      "value": 1
+    },
+    {
+      "source": "techstream2024",
+      "target": "williams2001",
+      "value": 1
+    },
+    {
+      "source": "mittechnologyreview2023",
+      "target": "osorio2015",
+      "value": 1
+    },
+    {
+      "source": "mittechnologyreview2023",
+      "target": "williams2001",
+      "value": 1
+    },
+    {
+      "source": "mittechnologyreview2023",
+      "target": "guerrerogutierrez2011",
+      "value": 1
+    },
+    {
+      "source": "mittechnologyreview2023",
+      "target": "campbell2014",
+      "value": 1
+    },
+    {
+      "source": "mittechnologyreview2023",
+      "target": "grayson2010",
+      "value": 1
+    },
+    {
+      "source": "busby2024",
+      "target": "campbell2014",
+      "value": 1
+    },
+    {
+      "source": "busby2024",
+      "target": "grillo2016",
+      "value": 1
+    },
+    {
+      "source": "busby2024",
+      "target": "grayson2010",
+      "value": 1
+    },
+    {
+      "source": "busby2024",
+      "target": "bunker2010",
+      "value": 1
+    },
+    {
+      "source": "busby2024",
+      "target": "prietocuriel2023",
+      "value": 1
+    },
+    {
+      "source": "theverge2023",
+      "target": "rios2013",
+      "value": 1
+    },
+    {
+      "source": "theverge2023",
+      "target": "guerrerogutierrez2011",
+      "value": 1
+    },
+    {
+      "source": "theverge2023",
+      "target": "phillips2015",
+      "value": 1
+    },
+    {
+      "source": "theverge2023",
+      "target": "osorio2015",
+      "value": 1
+    },
+    {
+      "source": "theverge2023",
+      "target": "bunker2013",
+      "value": 1
+    },
+    {
+      "source": "hrw2024",
+      "target": "felbabbrown2009",
+      "value": 1
+    },
+    {
+      "source": "hrw2024",
+      "target": "miklaucic2013",
+      "value": 1
+    },
+    {
+      "source": "hrw2024",
+      "target": "cornell2007",
+      "value": 1
+    },
+    {
+      "source": "hrw2024",
+      "target": "lessing2018",
+      "value": 1
+    },
+    {
+      "source": "hrw2024",
+      "target": "correa-cabrera2017",
+      "value": 1
+    },
+    {
+      "source": "hrw2024",
+      "target": "sageman2008",
+      "value": 1
+    },
+    {
+      "source": "hrw2024",
+      "target": "wiktorowicz2005",
+      "value": 1
+    },
+    {
+      "source": "hrw2024",
+      "target": "makarenko2008",
+      "value": 1
+    },
+    {
+      "source": "hrw2024",
+      "target": "dishman2001",
+      "value": 1
+    },
+    {
+      "source": "amnestyinternational2023",
+      "target": "hoffman2017",
+      "value": 1
+    },
+    {
+      "source": "amnestyinternational2023",
+      "target": "awan2017",
+      "value": 1
+    },
+    {
+      "source": "amnestyinternational2023",
+      "target": "jones2014",
+      "value": 1
+    },
+    {
+      "source": "bamber-zryd2024",
+      "target": "stern_berger2015",
+      "value": 1
+    },
+    {
+      "source": "bamber-zryd2024",
+      "target": "sageman2004",
+      "value": 1
+    },
+    {
+      "source": "bamber-zryd2024",
+      "target": "sageman2008",
+      "value": 1
+    },
+    {
+      "source": "bamber-zryd2024",
+      "target": "winter2015",
+      "value": 1
+    },
+    {
+      "source": "bamber-zryd2024",
+      "target": "cronin2009",
+      "value": 1
+    },
+    {
+      "source": "bunker2010",
+      "target": "astorga1999",
+      "value": 1
+    },
+    {
+      "source": "bunker2010",
+      "target": "williams2001",
+      "value": 1
+    },
+    {
+      "source": "kenney2007",
+      "target": "astorga1999",
+      "value": 1
+    },
+    {
+      "source": "kenney2007",
+      "target": "williams2001",
+      "value": 1
+    },
+    {
+      "source": "kenney2007",
+      "target": "wiktorowicz2005",
+      "value": 1
+    },
+    {
+      "source": "kenney2007",
+      "target": "thomas2005",
+      "value": 1
+    },
+    {
+      "source": "byman2015",
+      "target": "pape2005",
+      "value": 1
+    },
+    {
+      "source": "byman2015",
+      "target": "cronin2009",
+      "value": 1
+    },
+    {
+      "source": "felbabbrown2009",
+      "target": "williams2001",
+      "value": 1
+    },
+    {
+      "source": "felbabbrown2009",
+      "target": "astorga1999",
+      "value": 1
+    },
+    {
+      "source": "felbabbrown2009",
+      "target": "sageman2008",
+      "value": 1
+    },
+    {
+      "source": "felbabbrown2009",
+      "target": "sageman2004",
+      "value": 1
+    },
+    {
+      "source": "cornell2007",
+      "target": "astorga1999",
+      "value": 1
+    },
+    {
+      "source": "cornell2007",
+      "target": "williams2001",
+      "value": 1
+    },
+    {
+      "source": "cornell2007",
+      "target": "pape2005",
+      "value": 1
+    },
+    {
+      "source": "cornell2007",
+      "target": "sageman2004",
+      "value": 1
+    },
+    {
+      "source": "cockayne2011",
+      "target": "saab2009",
+      "value": 1
+    },
+    {
+      "source": "cockayne2011",
+      "target": "shelley2005",
+      "value": 1
+    },
+    {
+      "source": "cockayne2011",
+      "target": "dishman2001",
+      "value": 1
+    },
+    {
+      "source": "cockayne2011",
+      "target": "williams2001",
+      "value": 1
+    },
+    {
+      "source": "cockayne2011",
+      "target": "astorga1999",
+      "value": 1
+    },
+    {
+      "source": "cockayne2011",
+      "target": "wiktorowicz2005",
+      "value": 1
+    },
+    {
+      "source": "cockayne2011",
+      "target": "ctc2007",
+      "value": 1
+    },
+    {
+      "source": "heinle2015",
+      "target": "astorga1999",
+      "value": 1
+    },
+    {
+      "source": "heinle2015",
+      "target": "williams2001",
+      "value": 1
+    },
+    {
+      "source": "heinle2015",
+      "target": "rios2013",
+      "value": 1
+    }
+  ],
+  "stats": {
+    "total_nodes": 135,
+    "total_links": 428,
+    "tier1": 48,
+    "tier2": 27,
+    "tier3": 60,
+    "domains": {
+      "cartels": 53,
+      "terrorism": 41,
+      "convergence": 23,
+      "hezbollah": 6,
+      "government": 5,
+      "journalism": 7
+    },
+    "filtered_links": 403,
+    "max_in_degree": 26
+  }
+};
+        const metricsData = {
+  "centrality_distribution": {
+    "0.0-0.1": 83,
+    "0.1-0.2": 18,
+    "0.2-0.3": 13,
+    "0.3-0.4": 8,
+    "0.4-0.5": 3,
+    "0.5-0.6": 6,
+    "0.6-0.7": 4,
+    "0.7-1.0": 0
+  },
+  "citation_matrix": {
+    "cartels": {
+      "cartels": 171,
+      "terrorism": 0,
+      "convergence": 2,
+      "hezbollah": 0,
+      "government": 0,
+      "journalism": 0
+    },
+    "terrorism": {
+      "cartels": 1,
+      "terrorism": 80,
+      "convergence": 0,
+      "hezbollah": 0,
+      "government": 0,
+      "journalism": 0
+    },
+    "convergence": {
+      "cartels": 45,
+      "terrorism": 42,
+      "convergence": 53,
+      "hezbollah": 0,
+      "government": 0,
+      "journalism": 0
+    },
+    "hezbollah": {
+      "cartels": 0,
+      "terrorism": 0,
+      "convergence": 0,
+      "hezbollah": 0,
+      "government": 0,
+      "journalism": 0
+    },
+    "government": {
+      "cartels": 0,
+      "terrorism": 0,
+      "convergence": 0,
+      "hezbollah": 0,
+      "government": 0,
+      "journalism": 0
+    },
+    "journalism": {
+      "cartels": 3,
+      "terrorism": 0,
+      "convergence": 0,
+      "hezbollah": 0,
+      "government": 0,
+      "journalism": 6
+    }
+  },
+  "decade_stats": {
+    "2020": {
+      "count": 67,
+      "avg_centrality": 0.0676599519883102,
+      "total": 4.533216783216783
+    },
+    "2010": {
+      "count": 43,
+      "avg_centrality": 0.15746462839486094,
+      "total": 6.770979020979021
+    },
+    "2000": {
+      "count": 24,
+      "avg_centrality": 0.23747086247086246,
+      "total": 5.699300699300699
+    },
+    "1990": {
+      "count": 1,
+      "avg_centrality": 0.5,
+      "total": 0.5
+    }
+  },
+  "bridge_nodes": [
+    {
+      "id": "shelley2014",
+      "label": "Shelley (2014)",
+      "cross_links": 5,
+      "centrality": 0.5052447552447553
+    },
+    {
+      "id": "kenney2007",
+      "label": "Kenney (2007)",
+      "cross_links": 5,
+      "centrality": 0.19405594405594406
+    },
+    {
+      "id": "saab2009",
+      "label": "Saab, Taylor (2009)",
+      "cross_links": 4,
+      "centrality": 0.32342657342657344
+    },
+    {
+      "id": "shelley2005",
+      "label": "Shelley, Picarelli (2005)",
+      "cross_links": 4,
+      "centrality": 0.6538461538461539
+    },
+    {
+      "id": "makarenko2008",
+      "label": "Makarenko (2008)",
+      "cross_links": 4,
+      "centrality": 0.3758741258741259
+    },
+    {
+      "id": "miklaucic2013",
+      "label": "Miklaucic, Brewer (2013)",
+      "cross_links": 4,
+      "centrality": 0.23951048951048953
+    },
+    {
+      "id": "hesterman2013",
+      "label": "Hesterman (2013)",
+      "cross_links": 4,
+      "centrality": 0.038461538461538464
+    },
+    {
+      "id": "mullins2016",
+      "label": "Mullins, Wither (2016)",
+      "cross_links": 4,
+      "centrality": 0.057692307692307696
+    },
+    {
+      "id": "alvi2020",
+      "label": "Alvi (2020)",
+      "cross_links": 4,
+      "centrality": 0.0
+    },
+    {
+      "id": "unodc2024",
+      "label": "United Nations Office on Drugs and Crime (2024)",
+      "cross_links": 4,
+      "centrality": 0.0
+    }
+  ],
+  "key_findings": {
+    "cartel_to_terrorism": 0,
+    "terrorism_to_cartel": 1,
+    "total_convergence": 23,
+    "total_sources": 135,
+    "total_links": 403
+  }
+};
+        
+        // Network visualization
+        const container = document.getElementById('network-container');
+        const width = container.clientWidth;
+        const height = container.clientHeight;
+        
+        const svg = d3.select("#network-svg")
+            .attr("width", width)
+            .attr("height", height);
+        
+        const g = svg.append("g");
+        
+        const zoom = d3.zoom()
+            .scaleExtent([0.1, 4])
+            .on("zoom", (event) => {
+                g.attr("transform", event.transform);
+            });
+        
+        svg.call(zoom);
+        
+        const colorScale = {
+            'cartels': '#E74C3C',
+            'terrorism': '#3498DB',
+            'convergence': '#F39C12',
+            'hezbollah': '#2ECC71',
+            'government': '#95A5A6',
+            'journalism': '#9B59B6'
+        };
+        
+        const simulation = d3.forceSimulation(networkData.nodes)
+            .force("link", d3.forceLink(networkData.links)
+                .id(d => d.id)
+                .distance(d => {
+                    const avgCent = (d.source.centrality_score + d.target.centrality_score) / 2;
+                    return 50 + (1 - avgCent) * 100;
+                })
+                .strength(0.3))
+            .force("charge", d3.forceManyBody()
+                .strength(d => -200 - (d.centrality_score * 300))
+                .distanceMax(600))
+            .force("center", d3.forceCenter(width / 2, height / 2))
+            .force("radial", d3.forceRadial(
+                d => (1 - d.centrality_score) * 300,
+                width / 2,
+                height / 2
+            ).strength(0.5))
+            .force("collision", d3.forceCollide()
+                .radius(d => d.size + 6)
+                .strength(0.9));
+        
+        const link = g.append("g")
+            .selectAll("line")
+            .data(networkData.links)
+            .enter().append("line")
+            .attr("class", "link");
+        
+        const node = g.append("g")
+            .selectAll("circle")
+            .data(networkData.nodes)
+            .enter().append("circle")
+            .attr("class", d => d.centrality_score > 0.4 ? "node node-central" : "node")
+            .attr("r", d => d.size)
+            .attr("fill", d => colorScale[d.group] || '#95A5A6')
+            .call(d3.drag()
+                .on("start", dragstarted)
+                .on("drag", dragged)
+                .on("end", dragended))
+            .on("mouseover", showTooltip)
+            .on("mouseout", hideTooltip)
+            .on("click", highlightConnections);
+        
+        const labels = g.append("g")
+            .selectAll("text")
+            .data(networkData.nodes.filter(d => d.centrality_score > 0.3))
+            .enter().append("text")
+            .attr("class", "node-label node-label-visible")
+            .text(d => d.author.split(',')[0] + ' (' + d.year + ')')
+            .attr("dy", d => d.size + 8);
+        
+        simulation.on("tick", () => {
+            link
+                .attr("x1", d => d.source.x)
+                .attr("y1", d => d.source.y)
+                .attr("x2", d => d.target.x)
+                .attr("y2", d => d.target.y);
+            
+            node
+                .attr("cx", d => d.x)
+                .attr("cy", d => d.y);
+            
+            labels
+                .attr("x", d => d.x)
+                .attr("y", d => d.y);
+        });
+        
+        function dragstarted(event, d) {
+            if (!event.active) simulation.alphaTarget(0.3).restart();
+            d.fx = d.x;
+            d.fy = d.y;
+        }
+        
+        function dragged(event, d) {
+            d.fx = event.x;
+            d.fy = event.y;
+        }
+        
+        function dragended(event, d) {
+            if (!event.active) simulation.alphaTarget(0);
+            d.fx = null;
+            d.fy = null;
+        }
+        
+        function showTooltip(event, d) {
+            const tooltip = d3.select("#tooltip");
+            tooltip.transition().duration(200).style("opacity", 1);
+            tooltip.html(`
+                <h3>${d.title}</h3>
+                <div class="author">${d.author} (${d.year})</div>
+                <div class="metrics">
+                    <div class="metric-item">
+                        <span class="metric-label">Cited:</span>
+                        <span class="metric-value">${d.in_degree}×</span>
+                    </div>
+                    <div class="metric-item">
+                        <span class="metric-label">Cites:</span>
+                        <span class="metric-value">${d.out_degree}</span>
+                    </div>
+                    <div class="metric-item">
+                        <span class="metric-label">Centrality:</span>
+                        <span class="metric-value">${d.centrality_score.toFixed(3)}</span>
+                    </div>
+                    <div class="metric-item">
+                        <span class="metric-label">Domain:</span>
+                        <span class="metric-value">${d.group}</span>
+                    </div>
+                </div>
+                <div class="thesis">${d.thesis}</div>
+            `)
+                .style("left", (event.pageX + 15) + "px")
+                .style("top", (event.pageY - 15) + "px");
+        }
+        
+        function hideTooltip() {
+            d3.select("#tooltip").transition().duration(200).style("opacity", 0);
+        }
+        
+        let highlightedNode = null;
+        function highlightConnections(event, d) {
+            if (highlightedNode === d.id) {
+                link.attr("class", "link");
+                node.style("opacity", 1);
+                highlightedNode = null;
+            } else {
+                const connectedNodes = new Set();
+                connectedNodes.add(d.id);
+                
+                networkData.links.forEach(l => {
+                    if (l.source.id === d.id) connectedNodes.add(l.target.id);
+                    if (l.target.id === d.id) connectedNodes.add(l.source.id);
+                });
+                
+                link.attr("class", l => 
+                    (l.source.id === d.id || l.target.id === d.id) ? "link-highlight" : "link"
+                );
+                
+                node.style("opacity", n => connectedNodes.has(n.id) ? 1 : 0.15);
+                
+                highlightedNode = d.id;
+            }
+        }
+        
+        function resetView() {
+            svg.transition().duration(750).call(zoom.transform, d3.zoomIdentity);
+            link.attr("class", "link");
+            node.style("opacity", 1);
+            highlightedNode = null;
+        }
+        
+        function toggleLabels() {
+            const allLabels = g.selectAll(".node-label");
+            const currentOpacity = allLabels.style("opacity");
+            allLabels.transition().duration(300).style("opacity", currentOpacity === "0" ? 1 : 0);
+        }
+        
+        function showCentral() {
+            node.style("opacity", n => n.centrality_score > 0.3 ? 1 : 0.1);
+            link.style("opacity", l => 
+                (l.source.centrality_score > 0.3 && l.target.centrality_score > 0.3) ? 0.3 : 0.05
+            );
+        }
+        
+        function showBridges() {
+            const bridgeNodes = new Set(
+                networkData.nodes.filter(n => n.group === 'convergence').map(n => n.id)
+            );
+            
+            node.style("opacity", n => bridgeNodes.has(n.id) || n.centrality_score > 0.4 ? 1 : 0.1);
+            link.style("opacity", l => 
+                (bridgeNodes.has(l.source.id) || bridgeNodes.has(l.target.id)) ? 0.4 : 0.05
+            );
+        }
+    </script>
+</body>
+</html>
